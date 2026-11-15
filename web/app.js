@@ -8,6 +8,9 @@ const memoryGrid = document.getElementById('memory-grid');
 const inspectLink = document.getElementById('inspect-link');
 const previousButton = document.getElementById('step-previous');
 const nextButton = document.getElementById('step-next');
+const replayControls = document.getElementById('replay-controls');
+const replayButton = document.getElementById('replay-button');
+const replayStatus = document.getElementById('replay-status');
 
 const users = {
   alice: { name: 'Alice Morgan', tty: 'tty01', home: '/usr/alice' },
@@ -21,6 +24,8 @@ let busy = false;
 const commands = [];
 let historyIndex = 0;
 let lessonStep = 0;
+let replayTimer = null;
+let replayPosition = 0;
 
 function write(message = '') {
   const div = document.createElement('div');
@@ -176,8 +181,80 @@ function baseMemory() {
   return [...Array(16).fill(0), 71, 85, 69, 83, 84, 0, 0, 0];
 }
 
+function stopReplay() {
+  if (replayTimer !== null) clearInterval(replayTimer);
+  replayTimer = null;
+}
+
+function showBytes(bytes, written = 0, active = -1) {
+  memoryGrid.replaceChildren();
+  bytes.forEach((number, index) => {
+    const cell = document.createElement('div');
+    const role = index >= 16;
+    const overwritten = role && index < written;
+    cell.className = 'memory-byte' + (role ? ' role' : '')
+      + (overwritten ? ' overwritten' : '') + (index === active ? ' current' : '');
+    const character = document.createElement('span');
+    character.textContent = number === 0 ? '·' :
+      number >= 32 && number <= 126 ? String.fromCharCode(number) : '·';
+    const offset = document.createElement('span');
+    offset.className = 'offset';
+    offset.textContent = String(index);
+    cell.title = 'Byte ' + index + ': 0x' + number.toString(16).toUpperCase().padStart(2, '0');
+    cell.append(character, offset);
+    memoryGrid.append(cell);
+  });
+}
+
+function replayWrites() {
+  if (!lastResult || lessonStep !== 2) return;
+  stopReplay();
+  const writes = [...lastName].map(char => char.charCodeAt(0)).concat(0);
+  const starting = baseMemory();
+  const expected = starting.slice();
+  writes.forEach((value, index) => { expected[index] = value; });
+  const actual = lastResult.memory.map(hex => parseInt(hex, 16));
+
+  if (expected.some((value, index) => value !== actual[index])) {
+    replayControls.hidden = true;
+    showBytes(actual, lastName.length + 1);
+    document.getElementById('memory-explanation').textContent =
+      'The final C memory does not match the reconstructed writes. Replay is unavailable.';
+    return;
+  }
+
+  replayPosition = 0;
+  const bytes = starting.slice();
+  showBytes(bytes);
+  replayStatus.textContent = '0 / ' + writes.length + ' bytes written';
+  document.getElementById('memory-explanation').textContent =
+    'Watch the name fill its 16 spaces, then reach the neighboring role field.';
+
+  replayTimer = setInterval(() => {
+    if (lessonStep !== 2 || analysisView.hidden) { stopReplay(); return; }
+    const index = replayPosition;
+    bytes[index] = writes[index];
+    replayPosition++;
+    showBytes(bytes, replayPosition, index);
+    replayStatus.textContent = replayPosition + ' / ' + writes.length + ' bytes written';
+    if (index >= 16) {
+      document.getElementById('memory-explanation').textContent =
+        'Byte ' + index + ' is outside the name buffer. The role is being changed.';
+    }
+    if (replayPosition === writes.length) {
+      stopReplay();
+      replayStatus.textContent = 'Finished · ' + writes.length + ' bytes written';
+      document.getElementById('memory-explanation').textContent =
+        'The role changed from GUEST to ' + lastResult.role +
+        '. This is a controlled C model, not the original 1988 exploit.';
+    }
+  }, 150);
+}
+
 function renderLesson() {
   if (!lastResult) return;
+  stopReplay();
+
   const rejected = lastResult.status === 'INPUT REJECTED';
   const isLong = lastName.length >= 16;
   const initial = baseMemory();
@@ -208,12 +285,12 @@ function renderLesson() {
       description: rejected
         ? 'This time the C program checked the length first. It rejected the request instead of writing beyond the name field.'
         : isLong
-          ? 'The unchecked input changed bytes belonging to the neighboring role. The final bytes shown here came from the C program.'
+          ? 'Watch how the unchecked input goes beyond the name buffer and changes the adjacent role.'
           : 'The name stayed inside its own space. The neighboring field was not modified.',
       explanation: rejected
         ? 'The role still reads GUEST. No input bytes were copied.'
         : isLong
-          ? 'The amber boxes show the neighboring memory affected by the input in our controlled model.'
+          ? 'The highlighted boxes show neighboring memory affected by our controlled C experiment.'
           : 'The neighboring role still reads GUEST.'
     },
     {
@@ -231,23 +308,11 @@ function renderLesson() {
   document.getElementById('memory-label').textContent = lessonStep === 0
     ? 'BEFORE INPUT' : lessonStep === 1 ? 'FIRST 16 BYTES' : 'RESULT FROM C';
 
-  memoryGrid.replaceChildren();
-  bytes.forEach((number,index) => {
-    const cell = document.createElement('div');
-    const role = index >= 16;
-    const overwritten = lessonStep >= 2 && !rejected &&
-      lastResult.mode === 'vulnerable' && role && isLong && index <= lastName.length;
-    cell.className = 'memory-byte' + (role ? ' role' : '') + (overwritten ? ' overwritten' : '');
-    const char = document.createElement('span');
-    char.textContent = number === 0 ? '·' :
-      number >= 32 && number <= 126 ? String.fromCharCode(number) : '·';
-    const offset = document.createElement('span');
-    offset.className = 'offset';
-    offset.textContent = String(index);
-    cell.title = 'Byte ' + index + ': 0x' + number.toString(16).toUpperCase().padStart(2,'0');
-    cell.append(char,offset);
-    memoryGrid.append(cell);
-  });
+  const canReplay = lessonStep === 2 && isLong && !rejected && lastResult.mode === 'vulnerable';
+  replayControls.hidden = !canReplay;
+  showBytes(bytes, lessonStep >= 2 && !rejected && isLong ? lastName.length + 1 : 0);
+  if (canReplay) replayWrites();
+
   previousButton.disabled = lessonStep === 0;
   nextButton.textContent = lessonStep === 3 ? 'Start over ↻' : 'Next →';
 }
@@ -262,6 +327,7 @@ function showAnalysis() {
 }
 
 function closeAnalysis() {
+  stopReplay();
   analysisView.hidden = true;
   terminalView.hidden = false;
   input.focus();
@@ -276,6 +342,7 @@ nextButton.addEventListener('click', () => {
   renderLesson();
 });
 inspectLink.addEventListener('click', showAnalysis);
+replayButton.addEventListener('click', replayWrites);
 form.addEventListener('submit', async event => {
   event.preventDefault();
   if (busy) return;
