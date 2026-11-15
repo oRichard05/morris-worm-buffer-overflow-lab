@@ -15,72 +15,78 @@
         <div id="terminal-output" class="screen-lines" role="log" aria-live="polite" aria-relevant="additions"></div>
         <form id="command-form" class="command-form" autocomplete="off">
           <label for="command-input">research-vax% </label>
-          <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="UNIX command" maxlength="160">
+          <div class="terminal-input-wrap">
+            <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="UNIX command" maxlength="160">
+            <span id="terminal-block-cursor" class="terminal-block-cursor" aria-hidden="true"> </span>
+          </div>
         </form>
       </section>
 
-      <aside class="trace-panel" aria-label="Educational memory and execution visualizer">
-        <header class="trace-heading">
+      <aside class="trace-panel" aria-label="Memory examination and execution trace">
+        <header class="inspector-header">
           <div>
-            <span class="eyebrow-small">MORRIS LAB / LOCAL MODEL</span>
-            <h1>Inside the process</h1>
+            <span class="eyebrow-small">MEMORY EXAMINATION / LOCAL C</span>
+            <h2>Inside the process</h2>
           </div>
-          <button id="trace-format" class="format-toggle" type="button" aria-pressed="false">HEX</button>
+          <span id="trace-state" class="trace-state" aria-live="polite">READY</span>
         </header>
 
-        <div class="trace-summary">
-          <span id="trace-state" class="trace-state" aria-live="polite">READY</span>
-          <span id="trace-source">BEFORE INPUT</span>
-        </div>
-
-        <div class="incoming">
-          <div class="trace-label"><span>INCOMING REQUEST</span><span id="input-length">0 BYTES</span></div>
-          <div id="input-preview" class="input-preview">Awaiting a finger request</div>
-        </div>
-
-        <section class="frame-display" aria-label="Simulated 24-byte C stack object">
-          <div class="trace-label"><span>STACK OBJECT / 24 BYTES</span><span>OFFSETS IN HEX</span></div>
-          <div class="region-label"><span>NAME BUFFER</span><span>00–0F · 16 BYTES</span></div>
-          <div id="name-bytes" class="byte-grid" aria-label="Name bytes"></div>
-
-          <div id="boundary-line" class="boundary-line">
-            <span class="boundary-dash"></span>
-            <strong>0x10 / BUFFER LIMIT</strong>
-            <span class="boundary-dash"></span>
+        <section class="next-action" aria-label="Next experiment">
+          <span id="guide-step" class="guide-step">01 / BASELINE</span>
+          <h3 id="guide-title">Start with a short name</h3>
+          <p id="guide-description">Watch a normal request stay inside its buffer.</p>
+          <div class="command-suggestion">
+            <code id="guide-command">finger alice@research-vax</code>
+            <button id="guide-run" type="button" aria-label="Run suggested command">Run <span aria-hidden="true">↵</span></button>
           </div>
-
-          <div class="region-label"><span>NEXT STEP</span><span>10–17 · 8 BYTES</span></div>
-          <div id="next-bytes" class="byte-grid" aria-label="Adjacent symbolic next-step bytes"></div>
+          <button id="inspect-link" class="explain-action" type="button" hidden>Understand what happened <span aria-hidden="true">↗</span></button>
         </section>
 
-        <div id="flow-visual" class="flow-visual">
-          <div><span>EXPECTED</span><strong>RETURN</strong></div>
-          <div class="flow-arrow" aria-hidden="true">→</div>
-          <div><span>MODEL RESULT</span><strong id="flow-value">—</strong></div>
-        </div>
+        <section class="dump-section" aria-label="Reconstructed stack memory">
+          <div class="dump-heading">
+            <span>STACK FRAME / 24 BYTES</span>
+            <span id="trace-source">BEFORE INPUT</span>
+          </div>
+          <div class="request-line">
+            <span>REQUEST</span>
+            <code id="input-preview">—</code>
+            <span id="input-length">0 B</span>
+          </div>
 
-        <div class="trace-playback">
+          <div class="dump-table" aria-label="Memory hex dump: address, hexadecimal bytes and ASCII">
+            <div class="dump-column-headers" aria-hidden="true">
+              <span>OFFSET</span><span>HEX BYTES / 00–07</span><span>ASCII</span>
+            </div>
+            <div class="dump-region-title"><span>name[16]</span><span>16 BYTES</span></div>
+            <div id="name-bytes" class="dump-rows" aria-label="Name buffer hex dump"></div>
+            <div id="boundary-line" class="boundary-line"><span>↑ END OF NAME BUFFER / 0x10</span></div>
+            <div class="dump-region-title next-title"><span>next_step[8]</span><span>8 BYTES</span></div>
+            <div id="next-bytes" class="dump-rows" aria-label="Adjacent next-step hex dump"></div>
+          </div>
+        </section>
+
+        <section id="flow-visual" class="execution-section" aria-label="Symbolic execution flow">
+          <span class="section-eyebrow">SYMBOLIC EXECUTION PATH</span>
+          <div class="execution-path">
+            <div><small>BEFORE</small><strong>RETURN</strong></div>
+            <span class="execution-arrow" aria-hidden="true">→</span>
+            <div><small>AFTER</small><strong id="flow-value">—</strong></div>
+          </div>
+        </section>
+
+        <section class="trace-playback" aria-label="Byte write replay">
           <div class="playback-top">
-            <span id="trace-caption" aria-live="polite">Waiting for the first request.</span>
+            <span id="trace-caption" aria-live="polite">Run a query to inspect memory.</span>
             <span id="trace-count">0 / 0</span>
           </div>
           <div class="playback-controls">
             <button id="trace-play" type="button" disabled>Replay</button>
-            <input id="trace-seek" type="range" min="0" max="1" step="1" value="0" disabled aria-label="Scrub memory write replay">
+            <input id="trace-seek" type="range" min="0" max="1" step="1" value="0" disabled aria-label="Scrub the reconstructed memory writes">
           </div>
-          <p id="byte-info" class="byte-info">Select a byte to inspect its value.</p>
-        </div>
-
-        <section class="next-action" aria-label="Suggested next step">
-          <span id="guide-step" class="eyebrow-small">01 / BASELINE</span>
-          <h2 id="guide-title">Start with a normal request</h2>
-          <p id="guide-description">See a name fit inside its memory boundary.</p>
-          <code id="guide-command">finger alice@research-vax</code>
-          <button id="guide-run" class="primary-action" type="button">Run example <span aria-hidden="true">↗</span></button>
-          <button id="inspect-link" class="primary-action" type="button" hidden>Understand the failure <span aria-hidden="true">↗</span></button>
+          <p id="byte-info" class="byte-info">Click a byte to inspect its address.</p>
         </section>
 
-        <p class="trace-foot">Byte-by-byte replay reconstructed from local C output. Not a live debugger or the original 1988 binary.</p>
+        <p class="trace-foot">Modern teaching view · byte writes reconstructed from the C result, not a live debugger or an original 1988 screen.</p>
       </aside>
     </div>
   </main>
