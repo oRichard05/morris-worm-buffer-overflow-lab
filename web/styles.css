@@ -187,6 +187,20 @@ button:focus-visible, input:focus-visible { outline: 2px solid #e8e8e7; outline-
 .inspect-link { align-self: center; }
 .snapshot-note { margin: 10px 0 0; color: #818a90; font: 10px/1.4 "Courier New",monospace; }
 
+@media (min-width: 961px) and (max-height: 730px) {
+  .terminal-view { padding: 12px 22px; }
+  .lab-header { padding-bottom: 8px; }
+  .lab-guide { padding: 8px 0 10px; }
+  .guide-progress { margin-bottom: 9px; }
+  .guide-content { min-height: 58px; }
+  .terminal-section { padding-top: 4px; }
+  .screen { height: max(176px, 33dvh); min-height: 176px; padding: 10px 15px; }
+  .memory-section { margin-top: 8px; padding-top: 4px; }
+  .snapshot-byte { height: 37px; }
+  .snapshot-note { margin-top: 6px; }
+  .memory-caption { margin-top: 8px; }
+}
+
 @media (max-width: 960px) {
   .guide-content { grid-template-columns: 1fr; gap: 12px; }
   .guide-action { justify-content: stretch; }
