@@ -1,10 +1,10 @@
-# Morris Worm: Stack Buffer Overflow Lab
+# Morris Worm: Buffer Overflow Lab
 
-An interactive, local C memory-safety demonstration inspired by the 1988 Morris Worm. Prepared for COMP 211 Checkoff 3.
+An interactive C memory-safety project inspired by the 1988 Morris Worm. Developed for COMP 211 Checkoff 3.
 
-## Run
+## Start the program
 
-Requires Node.js 18+, a C compiler (`cc`), and `make`.
+Requirements: Node.js 18+, a C compiler (`cc`), and `make`.
 
 ```sh
 git clone https://github.com/oRichard05/morris-worm-buffer-overflow-lab.git
@@ -13,36 +13,22 @@ npm run build:lab
 npm start
 ```
 
-Open http://127.0.0.1:4173. No package installation or internet connection is required after cloning.
+Open [http://127.0.0.1:4173](http://127.0.0.1:4173) in a browser. No third-party packages are needed.
 
-The opening screen is a minimal, 4.3BSD-style UNIX terminal reconstruction. Enter commands directly at the prompt. For a presentation, open the page in a browser with the window maximized.
+The program opens directly into a fictional 1988-style UNIX user information system. Navigate by typing menu numbers and pressing Enter.
 
-## Demonstration
+## Demonstration sequence
 
-Type these commands one at a time:
+1. Select **2 — Restricted records**. Access should be denied.
+2. Return to the menu. Select **1 — User directory** and enter `alice` to make a normal request.
+3. Return to **1 — User directory** and enter `AAAAAAAAAAAAAAAAADMIN` (16 A's followed by `ADMIN`).
+4. Return to the menu and select **2 — Restricted records** again. The fictional records are now accessible because the C experiment returned an overwritten `ADMIN` role.
+5. Press **I** to open the separate memory investigation. This view displays the actual 24-byte output from the C program, explanations, historical context, and an option to apply the fix.
+6. Select **Apply fix and return to computer**. Repeat the same long lookup, then try option **2**. Access should remain denied.
 
-```text
-finger alice
-finger AAAAAAAAAAAAAAAAADMIN
-status
-inspect
-```
+**Escape** returns to the menu or closes the investigation. **Enter** advances between screens. The menu is intentionally minimal so the security demonstration happens before the technical explanation.
 
-`finger alice` returns a sample user record. The long input crosses the 16-byte name field in the controlled C demo and changes an adjacent role field to `ADMIN`. `status` displays the most recent C result. `inspect` opens a separate explanatory view showing the actual bytes returned by the C program, the fix, and historical context.
-
-Return to the terminal, then test the corrected version:
-
-```text
-patch
-finger AAAAAAAAAAAAAAAAADMIN
-status
-```
-
-The patched version rejects the same input. Type `help` for the full command list, or `reset` to restore the vulnerable demo.
-
-The terminal interface is a reconstruction, not a full UNIX shell or an original 1988 installation. Commands such as `patch` and `inspect` control this lab, not a historical operating system.
-
-## Run the C experiments directly
+## Run the C programs directly
 
 ```sh
 npm run build:lab
@@ -52,30 +38,30 @@ npm run build:lab
 npm test
 ```
 
-The programs print the session's 24 bytes in hexadecimal. The first 16 bytes hold the name; the final 8 bytes hold the role.
+The programs print the 24 bytes of a local `Session` object in hexadecimal. The first 16 bytes store the name and the final 8 bytes store the role.
 
-## Structure
+## Project files
 
 ```text
 lab/
-  vulnerable.c     Controlled name-field overrun in a stack object
-  patched.c        Name length check before copying
-  Makefile         Builds the C programs
-  check.sh         Tests expected behaviors
+  vulnerable.c     Controlled memory-boundary demonstration
+  patched.c        Corrected input-length check
+  Makefile         Builds both programs
+  check.sh         Checks expected outcomes
 web/
-  server.mjs       Localhost HTTP server and C process runner
-  index.html       Terminal and separately opened investigation
-  app.js           Command handling and memory display
-  styles.css       Minimal terminal appearance
+  server.mjs       Local HTTP server and C process runner
+  index.html       UNIX-style program and separate investigation
+  app.js           Menu navigation and C-backed requests
+  styles.css       Monochrome terminal styling
 ```
 
-## Historical context and limitations
+## Historical background
 
-In November 1988, the Morris Worm spread through multiple mechanisms, including a stack buffer overflow in the UNIX `fingerd` service. The historical flaw involved unchecked input to a local buffer and could redirect execution. It **did not** grant access by changing a `GUEST` role field.
+The Morris Worm spread across parts of the early Internet in November 1988, using several techniques. One was a stack buffer overflow in the UNIX `fingerd` service. The real vulnerability involved unsafe input handling and could change the program's execution flow.
 
-The C lab deliberately uses a simpler controlled model: it writes through the byte representation of an entire 24-byte local session object. The input crosses the name field's logical boundary, modifying an adjacent role, but remains inside the enclosing object. This avoids relying on undefined out-of-object writes for a live classroom demonstration. It does not reproduce the original worm or its exploit.
+This lab is **not** a reproduction of the original `fingerd` application, worm, or exploit. The terminal menu, restricted records, and `GUEST`/`ADMIN` role are fictional teaching devices. The local C code demonstrates adjacent-field corruption by writing within the byte representation of a single 24-byte stack object, without exceeding the enclosing object. The browser's session authorization is derived from that C result. This makes the experiment reliable without relying on undefined out-of-object writes.
 
-All activity runs locally, with the server bound to `127.0.0.1`. No self-propagating code or publicly accessible vulnerable service is included.
+The server binds only to `127.0.0.1`. It is intended for controlled local use, not public hosting.
 
 ## References
 
@@ -84,4 +70,4 @@ All activity runs locally, with the server bound to `127.0.0.1`. No self-propaga
 - [FBI — Morris Worm](https://www.fbi.gov/history/cases-and-criminals/morris-worm)
 - [MITRE CWE-121 — Stack-based Buffer Overflow](https://cwe.mitre.org/data/definitions/121.html)
 
-The required presentation slides are authored separately by the student.
+The presentation slides are authored separately by the student, in accordance with the assignment.
