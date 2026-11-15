@@ -1,63 +1,65 @@
-const terminalView = document.getElementById('terminal-view');
-const analysisView = document.getElementById('analysis-view');
-const output = document.getElementById('terminal-output');
-const glass = document.getElementById('glass');
-const form = document.getElementById('command-form');
-const input = document.getElementById('command-input');
-const memoryGrid = document.getElementById('memory-grid');
-const inspectLink = document.getElementById('inspect-link');
-const previousButton = document.getElementById('step-previous');
-const nextButton = document.getElementById('step-next');
-const replayControls = document.getElementById('replay-controls');
-const replayButton = document.getElementById('replay-button');
-const replayStatus = document.getElementById('replay-status');
-const snapshotName = document.getElementById('snapshot-name');
-const snapshotRole = document.getElementById('snapshot-role');
-const snapshotState = document.getElementById('snapshot-state');
-const snapshotContext = document.getElementById('snapshot-context');
-const snapshotResult = document.getElementById('snapshot-result');
-const guideStep = document.getElementById('guide-step');
-const guideTitle = document.getElementById('guide-title');
-const guideDescription = document.getElementById('guide-description');
-const guideCommand = document.getElementById('guide-command');
-const guideInsert = document.getElementById('guide-insert');
-const memoryMonitor = document.querySelector('.memory-monitor');
-const memoryModeToggle = document.getElementById('memory-mode-toggle');
-const boundaryCopy = document.getElementById('boundary-copy');
-const roleValue = document.getElementById('role-value');
-const byteDetail = document.getElementById('byte-detail');
+const $ = id => document.getElementById(id);
+const terminalView = $('terminal-view');
+const analysisView = $('analysis-view');
+const output = $('terminal-output');
+const screen = $('glass');
+const form = $('command-form');
+const input = $('command-input');
 
+const nameBytes = $('name-bytes');
+const nextBytes = $('next-bytes');
+const tracePanel = document.querySelector('.trace-panel');
+const traceSeek = $('trace-seek');
+const tracePlay = $('trace-play');
+const traceFormat = $('trace-format');
 
 const users = {
   alice: { name: 'Alice Morgan', tty: 'tty01', home: '/usr/alice' },
   bsmith: { name: 'Brian Smith', tty: 'tty02', home: '/usr/bsmith' },
   guest: { name: 'Guest User', tty: 'tty00', home: '/usr/guest' }
 };
+const payload = 'AAAAAAAAAAAAAAAADIVERT';
 let mode = 'vulnerable';
 let lastResult = null;
 let lastName = '';
-let busy = false;
-const commands = [];
-let historyIndex = 0;
+let running = false;
+let format = 'ascii';
+let selectedByte = null;
+let bytes = initialFrame();
+let writes = [];
+let position = 0;
+let traceTimer = null;
+let replayVerified = false;
 let lessonStep = 0;
-let replayTimer = null;
-let replayPosition = 0;
-let memoryDisplayMode = 'ascii';
-let snapshotBytes = null;
-let selectedByteIndex = null;
+const history = [];
+let historyIndex = 0;
 
-function write(message = '') {
-  const div = document.createElement('div');
-  div.className = 'line';
-  div.textContent = message;
-  output.append(div);
-  while (output.children.length > 120) output.firstElementChild.remove();
-  glass.scrollTop = glass.scrollHeight;
+function initialFrame() {
+  return Array(16).fill(0).concat([82, 69, 84, 85, 82, 78, 0, 0]);
 }
-function lines(messages) { for (const message of messages) write(message); }
-function startup() {
+function byteText(number) {
+  if (format === 'hex') return number.toString(16).padStart(2, '0').toUpperCase();
+  if (number === 0) return '·';
+  return number >= 32 && number <= 126 ? String.fromCharCode(number) : '·';
+}
+function byteHex(number) {
+  return '0x' + number.toString(16).toUpperCase().padStart(2, '0');
+}
+function fieldText(data) {
+  return data.slice(16, 24).map(value => value === 0 ? '\0' : String.fromCharCode(value)).join('').split('\0')[0];
+}
+function writeLine(text = '') {
+  const line = document.createElement('div');
+  line.className = 'line';
+  line.textContent = text;
+  output.append(line);
+  while (output.children.length > 120) output.firstElementChild.remove();
+  screen.scrollTop = screen.scrollHeight;
+}
+function writeLines(lines) { for (const line of lines) writeLine(line); }
+function boot() {
   output.replaceChildren();
-  lines([
+  writeLines([
     '4.3 BSD UNIX (research-vax) (tty00)',
     '',
     'login: guest',
@@ -65,31 +67,33 @@ function startup() {
     ''
   ]);
 }
-function longFinger(id, showPlan = true) {
-  const user = users[id];
-  if (!user) { write('finger: ' + id + ': no such user'); return; }
-  write('Login name: ' + id.padEnd(10) + '                 In real life: ' + user.name);
-  write('Directory: ' + user.home.padEnd(28) + 'Shell: /bin/csh');
-  write('On since Nov  2 09:12:00 on ' + user.tty);
-  if (showPlan) write('No Plan.');
+function longFinger(name, plan = true) {
+  const user = users[name];
+  if (!user) { writeLine('finger: ' + name + ': no such user'); return; }
+  writeLine('Login name: ' + name.padEnd(10) + '                 In real life: ' + user.name);
+  writeLine('Directory: ' + user.home.padEnd(28) + 'Shell: /bin/csh');
+  writeLine('On since Nov  2 09:12:00 on ' + user.tty);
+  if (plan) writeLine('No Plan.');
 }
-function shortFinger(ids) {
-  write('Login       Name              TTY Idle    When            Office');
-  for (const id of ids) {
-    const user = users[id];
-    write(id.padEnd(12) + user.name.padEnd(18) + user.tty.padEnd(4)
+function shortFinger(names) {
+  writeLine('Login       Name              TTY Idle    When            Office');
+  for (const name of names) {
+    const user = users[name];
+    writeLine(name.padEnd(12) + user.name.padEnd(18) + user.tty.padEnd(4)
       + '  0:01    Nov  2 09:12');
   }
 }
 async function remoteFinger(name) {
-  if (!name) { shortFinger(['alice','bsmith','guest']); return; }
-  if (!/^[A-Za-z0-9_-]{1,21}$/.test(name)) {
-    write('finger: invalid remote user name');
+  if (!name) { shortFinger(['alice', 'bsmith', 'guest']); return; }
+  if (!/^[A-Za-z0-9_-]{1,22}$/.test(name)) {
+    writeLine('finger: invalid remote user name');
     return;
   }
-  busy = true;
+  running = true;
   input.disabled = true;
-  updateSnapshot(null, '', true);
+  stopTrace();
+  $('trace-state').textContent = 'RUNNING C';
+  $('trace-source').textContent = 'AWAITING RESULT';
   try {
     const response = await fetch('/api/run', {
       method: 'POST',
@@ -97,512 +101,428 @@ async function remoteFinger(name) {
       body: JSON.stringify({ mode, name })
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'remote query failed');
+    if (!response.ok) throw new Error(data.error || 'request failed');
+    if (!Array.isArray(data.memory) || data.memory.length !== 24) {
+      throw new Error('C program returned an unexpected memory layout');
+    }
     lastResult = data;
     lastName = name;
-    updateSnapshot(data, name);
+    useResult(data, name);
     updateGuide();
     if (data.status === 'INPUT REJECTED') {
-      write('finger: remote request rejected');
-    } else if (data.role === 'ADMIN' && data.vault === 'UNLOCKED') {
-      write('finger: connection to research-vax closed unexpectedly');
-    } else if (name.length >= 16) {
-      write('finger: remote host returned no user information');
+      writeLine('finger: remote request rejected');
+    } else if (data.flow === 'DIVERTED' || data.flow === 'CORRUPTED') {
+      writeLine('finger: connection to research-vax closed unexpectedly');
     } else {
       longFinger(name.toLowerCase());
     }
   } catch (error) {
-    lastResult = null;
-    lastName = '';
-    updateSnapshot();
-    updateGuide();
-    write('finger: ' + error.message);
+    writeLine('finger: ' + error.message);
+    $('trace-state').textContent = 'SERVICE ERROR';
+    $('trace-source').textContent = 'NO NEW SNAPSHOT';
   } finally {
-    busy = false;
+    running = false;
     input.disabled = false;
     input.focus();
   }
 }
 async function finger(args) {
-  const opts = args.filter(arg => arg.startsWith('-'));
+  const opts = args.filter(part => part.startsWith('-'));
   if (opts.some(opt => !/^-[lmspqi]+$/.test(opt))) {
-    write('usage: finger [-lmsp] [user ...] [user@host ...]');
+    writeLine('usage: finger [-lmsp] [user ...] [user@host ...]');
     return;
   }
-  const names = args.filter(arg => !arg.startsWith('-'));
+  const names = args.filter(part => !part.startsWith('-'));
   const flags = opts.join('');
-  if (names.length === 0) {
-    shortFinger(['alice','bsmith','guest']);
-    return;
-  }
+  if (!names.length) { shortFinger(['alice', 'bsmith', 'guest']); return; }
   if (names.some(name => name.includes('@'))) {
-    if (names.length !== 1) { write('finger: one remote query at a time'); return; }
+    if (names.length !== 1) { writeLine('finger: one remote query at a time'); return; }
     const [name, host, extra] = names[0].split('@');
     if (extra !== undefined || !['research-vax', 'research-vax.local'].includes((host || '').toLowerCase())) {
-      write('finger: unknown host');
+      writeLine('finger: unknown host');
       return;
     }
     await remoteFinger(name);
     return;
   }
   for (const name of names) {
-    const id = name.toLowerCase();
-    if (!(id in users)) { write('finger: ' + name + ': no such user'); continue; }
-    if (flags.includes('s') || flags.includes('q')) shortFinger([id]);
-    else longFinger(id, !flags.includes('p'));
-    if (names.length > 1) write();
+    const key = name.toLowerCase();
+    if (!users[key]) { writeLine('finger: ' + name + ': no such user'); continue; }
+    if (flags.includes('s') || flags.includes('q')) shortFinger([key]);
+    else longFinger(key, !flags.includes('p'));
+    if (names.length > 1) writeLine();
   }
-}
-function manFinger() {
-  lines([
-    "FINGER(1)             UNIX Programmer's Manual             FINGER(1)",
-    '',
-    'NAME',
-    '     finger - user information lookup program',
-    '',
-    'SYNOPSIS',
-    '     finger [ options ] name ...',
-    '',
-    'DESCRIPTION',
-    '     Display login and personal information for users.',
-    '     A remote query uses the form user@host.',
-    '',
-    'OPTIONS',
-    '     -l  long listing',
-    '     -s  short listing',
-    '     -p  do not display plan files'
-  ]);
 }
 async function run(raw) {
-  const tokens = raw.trim().split(/\s+/).filter(Boolean);
-  if (!tokens.length) return;
-  const command = tokens.shift().toLowerCase();
+  const parts = raw.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return;
+  const command = parts.shift().toLowerCase();
   switch (command) {
-    case 'finger': await finger(tokens); break;
-    case 'who':
-      lines(['guest    tty00   Nov  2 08:42', 'alice    tty01   Nov  2 09:12', 'bsmith   tty02   Nov  2 09:08']); break;
-    case 'whoami': write('guest'); break;
-    case 'hostname': write('research-vax'); break;
-    case 'date': write('Wed Nov  2 21:15:00 EST 1988'); break;
-    case 'pwd': write('/usr/guest'); break;
-    case 'uname': write(tokens.includes('-a') ? '4.3BSD research-vax 4.3 BSD UNIX VAX' : '4.3BSD'); break;
-    case 'ls': write('mail    notes    .plan'); break;
+    case 'finger': await finger(parts); break;
+    case 'who': writeLines(['guest    tty00   Nov  2 08:42', 'alice    tty01   Nov  2 09:12', 'bsmith   tty02   Nov  2 09:08']); break;
+    case 'whoami': writeLine('guest'); break;
+    case 'hostname': writeLine('research-vax'); break;
+    case 'date': writeLine('Wed Nov  2 21:15:00 EST 1988'); break;
+    case 'pwd': writeLine('/usr/guest'); break;
+    case 'uname': writeLine(parts.includes('-a') ? '4.3BSD research-vax 4.3 BSD UNIX VAX' : '4.3BSD'); break;
+    case 'ls': writeLine('mail    notes    .plan'); break;
     case 'cat':
-      if (tokens[0] === '/etc/motd') write('Welcome to research-vax.');
-      else if (tokens[0] === '.plan') write('No Plan.');
-      else write('cat: ' + (tokens[0] || '') + ': No such file or directory');
+      if (parts[0] === '/etc/motd') writeLine('Welcome to research-vax.');
+      else if (parts[0] === '.plan') writeLine('No Plan.');
+      else writeLine('cat: ' + (parts[0] || '') + ': No such file or directory');
       break;
     case 'man':
-      if (tokens[0] === 'finger') manFinger();
-      else write('No manual entry for ' + (tokens[0] || '') + '.');
+      if (parts[0] === 'finger') writeLines([
+        "FINGER(1)            UNIX Programmer's Manual           FINGER(1)",
+        '',
+        'NAME',
+        '     finger - user information lookup program',
+        '',
+        'SYNOPSIS',
+        '     finger [ options ] name ...',
+        '',
+        'DESCRIPTION',
+        '     Display local or remote user information.',
+        '     Remote requests use user@host.'
+      ]);
+      else writeLine('No manual entry for ' + (parts[0] || '') + '.');
       break;
     case 'clear': output.replaceChildren(); break;
-    case 'exit':
-    case 'logout': startup(); break;
-    default: write(command + ': Command not found.');
+    case 'logout':
+    case 'exit': boot(); break;
+    default: writeLine(command + ': Command not found.');
   }
 }
-function baseMemory() {
-  return [...Array(16).fill(0), 71, 85, 69, 83, 84, 0, 0, 0];
+async function submitCommand(command) {
+  if (running || !command.trim()) return;
+  writeLine('research-vax% ' + command);
+  history.push(command);
+  if (history.length > 40) history.shift();
+  historyIndex = history.length;
+  await run(command);
 }
-
-function displayByte(value) {
-  if (value === null) return '·';
-  if (memoryDisplayMode === 'hex') return value.toString(16).toUpperCase().padStart(2, '0');
-  if (value === 0) return '·';
-  return value >= 32 && value <= 126 ? String.fromCharCode(value) : '·';
-}
-
-function byteDescription(index) {
-  const group = index < 16 ? 'NAME' : 'ROLE';
-  const offset = '0x' + index.toString(16).toUpperCase().padStart(2, '0');
-  if (!snapshotBytes) return offset + ' · ' + group + ' · waiting for data';
-  const value = snapshotBytes[index];
-  const hex = '0x' + value.toString(16).toUpperCase().padStart(2, '0');
-  const char = value === 0 ? 'NUL' : value >= 32 && value <= 126 ? "'" + String.fromCharCode(value) + "'" : 'non-printable';
-  const original = baseMemory()[index];
-  const altered = index >= 16 && value !== original;
-  return offset + ' · ' + group + ' · ' + hex + ' (' + char + ')'
-    + (altered ? ' · was 0x' + original.toString(16).toUpperCase().padStart(2, '0') : '');
-}
-
-function selectMemoryByte(index) {
-  if (!snapshotBytes) return;
-  selectedByteIndex = index;
-  byteDetail.textContent = byteDescription(index);
-  [...snapshotName.children, ...snapshotRole.children].forEach((cell, position) => {
-    cell.classList.toggle('selected', index === position);
-    cell.setAttribute('aria-pressed', String(index === position));
-  });
-}
-
-function updateSnapshot(result = null, name = '', running = false) {
-  snapshotName.replaceChildren();
-  snapshotRole.replaceChildren();
-  snapshotBytes = result ? result.memory.map(hex => Number.parseInt(hex, 16)) : null;
-  const original = baseMemory();
-  const rejected = result && result.status === 'INPUT REJECTED';
-  const changed = Boolean(snapshotBytes && snapshotBytes.slice(16).some((value, i) => value !== original[16 + i]));
-  memoryMonitor.classList.toggle('is-changed', changed);
-  memoryMonitor.classList.toggle('is-rejected', Boolean(rejected));
-
-  for (let index = 0; index < 24; index++) {
-    const byte = snapshotBytes ? snapshotBytes[index] : null;
-    const cell = document.createElement('button');
-    cell.type = 'button';
-    cell.disabled = byte === null;
-    cell.className = 'snapshot-byte'
-      + (byte === null ? ' placeholder' : '')
-      + (changed && index >= 16 && byte !== original[index] ? ' changed' : '');
-    cell.setAttribute('aria-pressed', 'false');
-    const character = document.createElement('span');
-    character.className = 'byte-character';
-    character.textContent = displayByte(byte);
-    const offset = document.createElement('span');
-    offset.className = 'byte-index';
-    offset.textContent = index.toString(16).toUpperCase().padStart(2, '0');
-    cell.title = byte === null ? 'No C output yet' : byteDescription(index);
-    cell.setAttribute('aria-label', cell.title);
-    cell.addEventListener('click', () => selectMemoryByte(index));
-    cell.append(character, offset);
-    (index < 16 ? snapshotName : snapshotRole).append(cell);
-  }
-
-  if (!result) {
-    selectedByteIndex = null;
-    snapshotState.textContent = running ? 'READING C…' : 'NO QUERY YET';
-    snapshotContext.textContent = running ? 'AWAITING 24 BYTES' : '24-BYTE SESSION';
-    snapshotResult.textContent = running ? 'Waiting for the C result…' : 'Run a query to inspect its memory.';
-    byteDetail.textContent = 'Select a byte to inspect its address and value.';
-    roleValue.textContent = '—';
-    boundaryCopy.textContent = 'BUFFER ENDS AT 0x10';
-    return;
-  }
-
-  snapshotState.textContent = rejected ? 'INPUT REJECTED' : changed ? 'OVERFLOW DETECTED' : 'NO OVERFLOW';
-  snapshotContext.textContent = name.length + ' CHARACTERS · ' + result.mode.toUpperCase();
-  snapshotResult.textContent = rejected
-    ? 'Length checked. Adjacent memory is safe.'
-    : changed
-      ? 'Input crossed the boundary and changed the role.'
-      : 'Input fits. No adjacent bytes changed.';
-  roleValue.textContent = result.role || '(EMPTY)';
-  boundaryCopy.textContent = changed ? 'OVERFLOW → ROLE / 0x10'
-    : rejected ? 'INPUT REJECTED BEFORE COPY' : 'BUFFER ENDS AT 0x10';
-
-  if (selectedByteIndex !== null) selectMemoryByte(selectedByteIndex);
-  else byteDetail.textContent = 'Click any byte to inspect its address and value.';
-}
-
-memoryModeToggle.addEventListener('click', () => {
-  memoryDisplayMode = memoryDisplayMode === 'ascii' ? 'hex' : 'ascii';
-  const hex = memoryDisplayMode === 'hex';
-  memoryModeToggle.textContent = hex ? 'ASCII ↔' : 'HEX ↔';
-  memoryModeToggle.setAttribute('aria-label', hex ? 'Show ASCII characters' : 'Show hexadecimal byte values');
-  memoryModeToggle.setAttribute('aria-pressed', String(hex));
-  [...snapshotName.children, ...snapshotRole.children].forEach((cell, index) => {
-    cell.querySelector('.byte-character').textContent = displayByte(snapshotBytes ? snapshotBytes[index] : null);
-  });
-});
-
-function updateGuide() {
-  const longRequest = Boolean(lastResult && lastName.length >= 16);
-  let step = 1, label, title, description, command = '';
-
-  if (mode === 'patched' && longRequest) {
-    step = 4;
-    label = '04 / FIX VERIFIED';
-    title = 'The long request was blocked';
-    description = 'Same input, but the role stays GUEST.';
-  } else if (mode === 'patched') {
-    step = 4;
-    label = '04 / TEST THE FIX';
-    title = 'Repeat the exact same request';
-    description = 'This version checks the length before copying.';
-    command = 'finger AAAAAAAAAAAAAAAAADMIN@research-vax';
-  } else if (longRequest) {
-    step = 3;
-    label = '03 / INVESTIGATE';
-    title = lastResult.role === 'ADMIN' ? 'GUEST became ADMIN' : 'The input crossed the boundary';
-    description = 'Look at the role bytes below. The name has reached another field.';
-  } else if (lastResult) {
-    step = 2;
-    label = '02 / TEST THE LIMIT';
-    title = 'Now send a name that does not fit';
-    description = 'Compare the next snapshot with this normal result.';
-    command = 'finger AAAAAAAAAAAAAAAAADMIN@research-vax';
-  } else {
-    label = '01 / FIRST REQUEST';
-    title = 'Start with a normal lookup';
-    description = 'A short name should leave neighboring memory unchanged.';
-    command = 'finger alice@research-vax';
-  }
-
-  guideStep.textContent = label;
-  guideTitle.textContent = title;
-  guideDescription.textContent = description;
-  guideCommand.textContent = command;
-  guideCommand.hidden = !command;
-  guideInsert.hidden = !command;
-  inspectLink.hidden = !longRequest;
-  for (const item of document.querySelectorAll('[data-stage]')) {
-    const index = Number(item.dataset.stage);
-    item.classList.toggle('active', index === step);
-    item.classList.toggle('complete', index < step);
-  }
-}
-
-function stopReplay() {
-  if (replayTimer !== null) clearInterval(replayTimer);
-  replayTimer = null;
-}
-
-function showBytes(bytes, written = 0, active = -1) {
-  memoryGrid.replaceChildren();
-  bytes.forEach((number, index) => {
-    const cell = document.createElement('div');
-    const role = index >= 16;
-    const overwritten = role && index < written;
-    cell.className = 'memory-byte' + (role ? ' role' : '')
-      + (overwritten ? ' overwritten' : '') + (index === active ? ' current' : '');
-    const character = document.createElement('span');
-    character.textContent = number === 0 ? '·' :
-      number >= 32 && number <= 126 ? String.fromCharCode(number) : '·';
-    const offset = document.createElement('span');
-    offset.className = 'offset';
-    offset.textContent = String(index);
-    cell.title = 'Byte ' + index + ': 0x' + number.toString(16).toUpperCase().padStart(2, '0');
-    cell.append(character, offset);
-    memoryGrid.append(cell);
-  });
-}
-
-function replayWrites() {
-  if (!lastResult || lessonStep !== 2) return;
-  stopReplay();
-  const writes = [...lastName].map(char => char.charCodeAt(0)).concat(0);
-  const starting = baseMemory();
-  const expected = starting.slice();
-  writes.forEach((value, index) => { expected[index] = value; });
-  const actual = lastResult.memory.map(hex => parseInt(hex, 16));
-
-  if (expected.some((value, index) => value !== actual[index])) {
-    replayControls.hidden = true;
-    showBytes(actual, lastName.length + 1);
-    document.getElementById('memory-explanation').textContent =
-      'The final C memory does not match the reconstructed writes. Replay is unavailable.';
-    return;
-  }
-
-  replayPosition = 0;
-  const bytes = starting.slice();
-  showBytes(bytes);
-  replayStatus.textContent = '0 / ' + writes.length + ' bytes written';
-  document.getElementById('memory-explanation').textContent =
-    'Watch the name fill its 16 spaces, then reach the neighboring role field.';
-
-  replayTimer = setInterval(() => {
-    if (lessonStep !== 2 || analysisView.hidden) { stopReplay(); return; }
-    const index = replayPosition;
-    bytes[index] = writes[index];
-    replayPosition++;
-    showBytes(bytes, replayPosition, index);
-    replayStatus.textContent = replayPosition + ' / ' + writes.length + ' bytes written';
-    if (index >= 16) {
-      document.getElementById('memory-explanation').textContent =
-        'Byte ' + index + ' is outside the name buffer. The role is being changed.';
-    }
-    if (replayPosition === writes.length) {
-      stopReplay();
-      replayStatus.textContent = 'Finished · ' + writes.length + ' bytes written';
-      document.getElementById('memory-explanation').textContent =
-        'The role changed from GUEST to ' + lastResult.role +
-        '. This is a controlled C model, not the original 1988 exploit.';
-    }
-  }, 150);
-}
-
-function renderLesson() {
-  if (!lastResult) return;
-  stopReplay();
-
-  const rejected = lastResult.status === 'INPUT REJECTED';
-  const isLong = lastName.length >= 16;
-  const initial = baseMemory();
-  const letters = [...lastName].map(c => c.charCodeAt(0)).concat(0);
-  let bytes = initial.slice();
-
-  if (lessonStep === 1) {
-    for (let i = 0; i < Math.min(letters.length, 16); i++) bytes[i] = letters[i];
-  } else if (lessonStep >= 2) {
-    bytes = lastResult.memory.map(value => parseInt(value, 16));
-  }
-
-  const steps = [
-    {
-      title: 'Where does the name go?',
-      description: 'The C program has 16 bytes reserved for a name, followed by 8 bytes for a role.',
-      explanation: 'Each box is one byte. The name also needs a final byte to mark its end, so at most 15 letters fit safely.'
-    },
-    {
-      title: isLong ? 'The name does not fit' : 'The name fits',
-      description: 'This request contains ' + lastName.length + ' characters. With the end-of-string byte, it needs ' + (lastName.length + 1) + ' spaces. Only 16 are available for the name.',
-      explanation: isLong
-        ? rejected
-          ? 'These boxes show where the letters would go. The corrected program rejected the request before writing any of them.'
-          : 'The first 16 boxes fill up. There is still more input left, but no space left for the name.'
-        : 'There is room for the whole name and the end-of-string byte.'
-    },
-    {
-      title: rejected ? 'The fix stops the write' : isLong ? 'The input crosses the boundary' : 'The memory stays intact',
-      description: rejected
-        ? 'The corrected C program checked the length before copying anything. The request was rejected.'
-        : isLong
-          ? 'The input keeps going past the name field. In our C model, it changes the neighboring role from GUEST to ' + lastResult.role + '.'
-          : 'The input stays inside the name field. The role remains GUEST.',
-      explanation: rejected
-        ? 'No input was copied. The neighboring role still reads GUEST.'
-        : isLong
-          ? 'Watch the letters reach the end of the name field and enter the next memory region.'
-          : 'All the bytes stay where they belong.'
-    },
-    {
-      title: mode === 'patched' ? 'Why did the fix work?' : 'What happened in 1988?',
-      description: mode === 'patched'
-        ? 'The same long input was rejected because it would not fit in the buffer. The neighboring data was left unchanged.'
-        : 'The real UNIX fingerd service used an unchecked gets() call with a 512-byte buffer. The Morris Worm exploited that mistake to redirect the program\'s execution.',
-      explanation: mode === 'patched'
-        ? 'The historical lesson: check an input\'s length before writing it into memory. Return to the terminal or reset the experiment to compare.'
-        : 'Our 16-byte model only changes a role field; the 1988 attack could change which instructions ran. Choose Try the fix to repeat the same input with a length check.'
-    }
-  ];
-
-  const detail = steps[lessonStep];
-  document.getElementById('step-number').textContent = 'STEP ' + (lessonStep + 1) + ' OF 4';
-  document.getElementById('step-title').textContent = detail.title;
-  document.getElementById('step-description').textContent = detail.description;
-  document.getElementById('memory-explanation').textContent = detail.explanation;
-  document.getElementById('memory-label').textContent = lessonStep === 0
-    ? 'BEFORE INPUT' : lessonStep === 1 ? 'FIRST 16 BYTES' : 'RESULT FROM C';
-
-  const canReplay = lessonStep === 2 && isLong && !rejected && lastResult.mode === 'vulnerable';
-  replayControls.hidden = !canReplay;
-  showBytes(bytes, lessonStep >= 2 && !rejected && isLong ? lastName.length + 1 : 0);
-  if (canReplay) replayWrites();
-
-  previousButton.disabled = lessonStep === 0;
-  nextButton.textContent = lessonStep === 3
-    ? mode === 'patched' ? 'Back to terminal →' : 'Try the fix →'
-    : 'Next →';
-  document.getElementById('reset-demo').hidden = !(lessonStep === 3 && mode === 'patched');
-}
-
-function showAnalysis() {
-  if (!lastResult) return;
-  lessonStep = 0;
-  renderLesson();
-  terminalView.hidden = true;
-  analysisView.hidden = false;
-  window.scrollTo(0,0);
-}
-
-function closeAnalysis() {
-  stopReplay();
-  analysisView.hidden = true;
-  terminalView.hidden = false;
-  input.focus();
-}
-
-previousButton.addEventListener('click', () => {
-  lessonStep = Math.max(0,lessonStep - 1);
-  renderLesson();
-});
-function changeVersion(nextMode) {
-  const previousQuery = lastName;
-  mode = nextMode;
-  lastResult = null;
-  lastName = '';
-  updateSnapshot();
-  updateGuide();
-  closeAnalysis();
-  input.value = previousQuery ? 'finger ' + previousQuery + '@research-vax' : '';
-  input.focus();
-}
-
-nextButton.addEventListener('click', () => {
-  if (lessonStep === 3) {
-    if (mode === 'patched') closeAnalysis();
-    else changeVersion('patched');
-    return;
-  }
-  lessonStep++;
-  renderLesson();
-});
-inspectLink.addEventListener('click', showAnalysis);
-replayButton.addEventListener('click', replayWrites);
-
-async function submitCommand(value) {
-  if (busy || !value.trim()) return;
-  write('research-vax% ' + value);
-  commands.push(value);
-  if (commands.length > 40) commands.shift();
-  historyIndex = commands.length;
-  await run(value);
-}
-
-guideInsert.addEventListener('click', async () => {
-  const command = guideCommand.textContent;
-  if (busy || !command) return;
-  guideInsert.disabled = true;
-  try {
-    input.value = '';
-    await submitCommand(command);
-  } finally {
-    guideInsert.disabled = false;
-    input.focus();
-  }
-});
-
 form.addEventListener('submit', event => {
   event.preventDefault();
+  if (running) return;
   const command = input.value;
-  if (busy) return;
   input.value = '';
   void submitCommand(command);
 });
 input.addEventListener('keydown', event => {
-  if (event.key === 'ArrowUp' && commands.length) {
+  if (event.key === 'ArrowUp' && history.length) {
     event.preventDefault();
     historyIndex = Math.max(0, historyIndex - 1);
-    input.value = commands[historyIndex];
-  }
-  if (event.key === 'ArrowDown' && commands.length) {
+    input.value = history[historyIndex];
+  } else if (event.key === 'ArrowDown' && history.length) {
     event.preventDefault();
-    historyIndex = Math.min(commands.length, historyIndex + 1);
-    input.value = historyIndex === commands.length ? '' : commands[historyIndex];
+    historyIndex = Math.min(history.length, historyIndex + 1);
+    input.value = historyIndex === history.length ? '' : history[historyIndex];
   }
 });
-glass.addEventListener('click', event => {
+screen.addEventListener('click', event => {
   if (event.target !== input) input.focus();
 });
-document.getElementById('return-terminal').addEventListener('click', closeAnalysis);
-document.getElementById('reset-demo').addEventListener('click', () => {
-  changeVersion('vulnerable');
+
+function stopTrace() {
+  if (traceTimer !== null) clearInterval(traceTimer);
+  traceTimer = null;
+}
+function reconstructedFrame(step) {
+  const frame = initialFrame();
+  for (let i = 0; i < step && i < writes.length; i++) frame[i] = writes[i];
+  return frame;
+}
+function describeByte(index) {
+  const number = bytes[index];
+  const kind = index < 16 ? 'NAME' : 'NEXT STEP';
+  const before = initialFrame()[index];
+  let text = byteHex(index) + ' / ' + kind + ' = ' + byteHex(number);
+  if (number >= 32 && number <= 126) text += " ('" + String.fromCharCode(number) + "')";
+  if (index >= 16 && number !== before) text += ' · previously ' + byteHex(before);
+  return text;
+}
+function renderTrace() {
+  const baseline = initialFrame();
+  nameBytes.replaceChildren();
+  nextBytes.replaceChildren();
+  const overwritten = bytes.slice(16).some((byte, offset) => byte !== baseline[16 + offset]);
+  const crossed = position > 16 && replayVerified;
+  tracePanel.classList.toggle('is-crossing', crossed);
+  $('flow-visual').classList.toggle('is-diverted', Boolean(lastResult && position === writes.length && lastResult.flow === 'DIVERTED'));
+
+  for (let index = 0; index < 24; index++) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'byte'
+      + (index < position ? ' written' : '')
+      + (crossed && index >= 16 && index < position && bytes[index] !== baseline[index] ? ' crossed' : '')
+      + (position > 0 && index === position - 1 ? ' cursor' : '')
+      + (index === selectedByte ? ' chosen' : '');
+    const character = document.createElement('span');
+    character.textContent = byteText(bytes[index]);
+    const offset = document.createElement('small');
+    offset.textContent = index.toString(16).padStart(2, '0').toUpperCase();
+    item.title = describeByte(index);
+    item.setAttribute('aria-label', item.title);
+    item.addEventListener('click', () => {
+      selectedByte = index;
+      $('byte-info').textContent = describeByte(index);
+      renderTrace();
+    });
+    item.append(character, offset);
+    (index < 16 ? nameBytes : nextBytes).append(item);
+  }
+
+  const finishing = lastResult && (lastResult.status === 'INPUT REJECTED' || position >= writes.length);
+  $('flow-value').textContent = !lastResult ? '—'
+    : lastResult.status === 'INPUT REJECTED' ? 'RETURN'
+    : !finishing && position > 16 ? 'CHANGING…'
+    : finishing ? lastResult.next || '?' : 'RETURN';
+  $('trace-count').textContent = position + ' / ' + writes.length;
+  traceSeek.value = String(position);
+  $('trace-state').textContent = !lastResult ? 'READY'
+    : lastResult.status === 'INPUT REJECTED' ? 'LENGTH CHECK PASSED'
+    : !finishing && position > 16 ? 'BOUNDARY CROSSED'
+    : !finishing && position > 0 ? 'COPYING INPUT'
+    : finishing && overwritten ? 'NEXT STEP MODIFIED'
+    : finishing ? 'COPY COMPLETED' : 'REPLAY READY';
+  $('trace-caption').textContent = !lastResult ? 'Run a query to begin.'
+    : lastResult.status === 'INPUT REJECTED' ? 'No write performed. The original bytes remain.'
+    : !finishing && position > 16 ? 'The copy has reached the adjacent field.'
+    : !finishing ? 'Reconstructing writes from the C output…'
+    : lastResult.flow === 'DIVERTED' ? 'The model now selects a different next step.'
+    : 'Memory remains within the expected boundary.';
+  $('trace-source').textContent = !lastResult ? 'BEFORE INPUT'
+    : lastResult.status === 'INPUT REJECTED' ? 'PATCHED / C OUTPUT'
+    : 'REPLAY / VERIFIED';
+}
+function setTracePosition(next) {
+  position = Math.min(writes.length, Math.max(0, next));
+  bytes = reconstructedFrame(position);
+  renderTrace();
+}
+function playTrace() {
+  if (!replayVerified || !lastResult || !writes.length) return;
+  if (traceTimer !== null) {
+    stopTrace();
+    tracePlay.textContent = 'Play';
+    return;
+  }
+  if (position >= writes.length) setTracePosition(0);
+  tracePlay.textContent = 'Pause';
+  traceTimer = setInterval(() => {
+    setTracePosition(position + 1);
+    if (position >= writes.length) {
+      stopTrace();
+      tracePlay.textContent = 'Replay';
+    }
+  }, 95);
+}
+function useResult(result, name) {
+  stopTrace();
+  selectedByte = null;
+  $('input-preview').textContent = name;
+  $('input-length').textContent = name.length + ' CHARS + END BYTE';
+  const target = result.memory.map(hex => Number.parseInt(hex, 16));
+  const rejected = result.status === 'INPUT REJECTED';
+  writes = rejected ? [] : [...name].map(char => char.charCodeAt(0)).concat(0);
+  const expected = reconstructedFrame(writes.length);
+  replayVerified = !rejected && expected.every((byte, index) => byte === target[index]);
+  position = 0;
+
+  traceSeek.max = String(writes.length || 1);
+  traceSeek.disabled = !replayVerified;
+  tracePlay.disabled = !replayVerified;
+  tracePlay.textContent = 'Replay';
+
+  if (rejected || !replayVerified) {
+    bytes = target;
+    if (!rejected) position = writes.length;
+  } else {
+    bytes = initialFrame();
+  }
+  renderTrace();
+  if (replayVerified) playTrace();
+}
+tracePlay.addEventListener('click', playTrace);
+traceSeek.addEventListener('input', () => {
+  if (!replayVerified) return;
+  stopTrace();
+  tracePlay.textContent = 'Play';
+  setTracePosition(Number(traceSeek.value));
 });
+traceFormat.addEventListener('click', () => {
+  format = format === 'ascii' ? 'hex' : 'ascii';
+  traceFormat.textContent = format === 'hex' ? 'ASCII' : 'HEX';
+  traceFormat.setAttribute('aria-pressed', String(format === 'hex'));
+  renderTrace();
+});
+
+function updateGuide() {
+  let label, title, description, command = '';
+  const hasLong = Boolean(lastResult && lastName.length >= 16);
+  if (mode === 'patched' && hasLong) {
+    label = '04 / PROTECTED'; title = 'The copy was stopped';
+    description = 'Same request. The next step stayed RETURN.';
+  } else if (mode === 'patched') {
+    label = '04 / COMPARE'; title = 'Test the fix';
+    description = 'Run the same long request with the length check.';
+    command = 'finger ' + payload + '@research-vax';
+  } else if (hasLong) {
+    label = '03 / EXPLAIN'; title = 'Follow the overwritten bytes';
+    description = 'The boundary has been crossed. Examine the trace.';
+  } else if (lastResult) {
+    label = '02 / OVERFLOW'; title = 'Now exceed 16 bytes';
+    description = 'Compare this write with a longer request.';
+    command = 'finger ' + payload + '@research-vax';
+  } else {
+    label = '01 / BASELINE'; title = 'Start with a short name';
+    description = 'Watch a normal request stay inside its buffer.';
+    command = 'finger alice@research-vax';
+  }
+  $('guide-step').textContent = label;
+  $('guide-title').textContent = title;
+  $('guide-description').textContent = description;
+  $('guide-command').textContent = command;
+  $('guide-command').hidden = !command;
+  $('guide-run').hidden = !command;
+  $('inspect-link').hidden = !hasLong;
+}
+$('guide-run').addEventListener('click', async () => {
+  const cmd = $('guide-command').textContent;
+  if (!cmd || running) return;
+  const button = $('guide-run');
+  button.disabled = true;
+  try { await submitCommand(cmd); }
+  finally { button.disabled = false; input.focus(); }
+});
+
+function showAnalysis() {
+  if (!lastResult) return;
+  stopTrace();
+  lessonStep = 0;
+  drawLesson();
+  terminalView.hidden = true;
+  analysisView.hidden = false;
+  window.scrollTo(0, 0);
+}
+function closeAnalysis() {
+  analysisView.hidden = true;
+  terminalView.hidden = false;
+  input.focus();
+}
+function drawLesson() {
+  if (!lastResult) return;
+  const rejected = lastResult.status === 'INPUT REJECTED';
+  const long = lastName.length >= 16;
+  const actual = lastResult.memory.map(hex => Number.parseInt(hex, 16));
+  let current = initialFrame();
+  if (lessonStep === 1) {
+    const first = [...lastName].map(char => char.charCodeAt(0)).concat(0);
+    for (let i = 0; i < Math.min(16, first.length); i++) current[i] = first[i];
+  }
+  if (lessonStep >= 2) current = actual;
+
+  const steps = [
+    {
+      title: 'A fixed amount of space',
+      description: 'The local C model reserves 16 bytes for a name. The next 8 bytes hold a label describing what the program would do next.',
+      note: 'These are neighboring fields of one C stack object, not the original 1988 machine layout.'
+    },
+    {
+      title: long ? 'The request does not fit' : 'The request fits',
+      description: lastName.length + ' characters need ' + (lastName.length + 1) + ' bytes with the end marker. The name field has only 16.',
+      note: rejected ? 'This is only a preview. The corrected program rejected the input before copying it.'
+        : 'Notice where the name ends and the next field begins.'
+    },
+    {
+      title: rejected ? 'The length check prevents the write' : long ? 'The copy reaches the next field' : 'The next field stays unchanged',
+      description: rejected ? 'The corrected program refused the oversized input. No neighboring bytes were touched.'
+        : long ? 'The unchecked write changed the symbolic next step from RETURN to ' + lastResult.next + '.'
+          : 'The string ended before reaching the boundary.',
+      note: rejected ? 'The next-step field still contains RETURN.'
+        : 'The main inspector replays these bytes individually, using the result returned by C.'
+    },
+    {
+      title: 'What really happened in 1988',
+      description: 'The historical 4.3BSD fingerd used gets() with a 512-byte stack buffer and did not check the incoming line length. The Morris Worm exploited this flaw on vulnerable VAX systems to redirect real execution.',
+      note: 'Our model changes data representing a next step. It does not overwrite an actual return address or execute the worm.'
+    }
+  ];
+  const detail = steps[lessonStep];
+  $('lesson-count').textContent = String(lessonStep + 1).padStart(2, '0') + ' / 04';
+  $('lesson-title').textContent = detail.title;
+  $('lesson-text').textContent = detail.description;
+  $('lesson-note').textContent = detail.note;
+  $('lesson-memory').replaceChildren();
+  current.forEach((value, index) => {
+    const cell = document.createElement('div');
+    cell.className = 'lesson-byte' + (index >= 16 ? ' next' : '')
+      + (lessonStep >= 2 && !rejected && index >= 16 && value !== initialFrame()[index] ? ' overwritten' : '');
+    const char = document.createElement('span');
+    char.textContent = value === 0 ? '·' : value >= 32 && value <= 126 ? String.fromCharCode(value) : '·';
+    const addr = document.createElement('small');
+    addr.textContent = index.toString(16).padStart(2, '0').toUpperCase();
+    cell.append(char, addr);
+    $('lesson-memory').append(cell);
+  });
+  $('lesson-previous').disabled = lessonStep === 0;
+  $('lesson-next').textContent = lessonStep < 3 ? 'Next →'
+    : mode === 'vulnerable' ? 'Try the corrected version →' : 'Return to terminal →';
+  $('lesson-reset').hidden = !(lessonStep === 3 && mode === 'patched');
+}
+function switchMode(nextMode) {
+  stopTrace();
+  const previous = lastName;
+  mode = nextMode;
+  lastResult = null;
+  lastName = '';
+  writes = [];
+  position = 0;
+  replayVerified = false;
+  bytes = initialFrame();
+  selectedByte = null;
+  $('input-preview').textContent = 'Awaiting a finger request';
+  $('input-length').textContent = '0 BYTES';
+  traceSeek.disabled = true;
+  tracePlay.disabled = true;
+  traceSeek.max = '1';
+  tracePlay.textContent = 'Replay';
+  renderTrace();
+  updateGuide();
+  closeAnalysis();
+  input.value = previous ? 'finger ' + previous + '@research-vax' : '';
+}
+$('guide-run').addEventListener('mouseenter', () => {});
+$('inspect-link').addEventListener('click', showAnalysis);
+$('back-terminal').addEventListener('click', closeAnalysis);
+$('lesson-previous').addEventListener('click', () => {
+  lessonStep = Math.max(0, lessonStep - 1);
+  drawLesson();
+});
+$('lesson-next').addEventListener('click', () => {
+  if (lessonStep === 3) {
+    if (mode === 'patched') closeAnalysis();
+    else switchMode('patched');
+    return;
+  }
+  lessonStep++;
+  drawLesson();
+});
+$('lesson-reset').addEventListener('click', () => switchMode('vulnerable'));
 document.addEventListener('keydown', event => {
   if (event.key === 'F2' && analysisView.hidden && lastResult) {
-    event.preventDefault();
-    showAnalysis();
+    event.preventDefault(); showAnalysis();
   }
   if (event.key === 'Escape' && !analysisView.hidden) {
-    event.preventDefault();
-    closeAnalysis();
+    event.preventDefault(); closeAnalysis();
   }
 });
-startup();
-updateSnapshot();
+
+boot();
+renderTrace();
 updateGuide();
-fetch('/api/health').then(res => res.json()).then(data => {
-  if (!data.ready) write('finger: C lab is not compiled');
-}).catch(() => write('finger: local demo server unavailable'));
+fetch('/api/health').then(response => response.json()).then(data => {
+  if (!data.ready) writeLine('finger: local C models are not compiled (run npm run build:lab)');
+}).catch(() => writeLine('finger: local demonstration unavailable'));
 input.focus();
