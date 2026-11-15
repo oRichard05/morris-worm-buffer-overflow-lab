@@ -261,15 +261,20 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f4f4f0; outline-
 .memory-lab.is-overflow .write-pointer { background: #ffb58e; }
 .memory-lab.is-overflow .write-pointer::after { border-top-color: #ffb58e; }
 .address-ruler {
-  display: grid;
-  grid-template-columns: 2fr 1fr 15px;
-  align-items: center;
+  position: relative;
+  height: 1.2em;
   margin-top: 11px;
   color: #b3c4c9;
   font: 600 13px/1.2 "Courier New",monospace;
 }
-.address-ruler span:nth-child(2) { color: #f1f4f2; }
-.address-ruler span:last-child { text-align: right; }
+.address-ruler span { position: absolute; top: 0; white-space: nowrap; }
+.address-ruler span:first-child { left: 0; }
+.address-ruler span:nth-child(2) {
+  left: 66.6667%;
+  transform: translateX(-50%);
+  color: #f1f4f2;
+}
+.address-ruler span:last-child { right: 0; text-align: right; }
 .zoom-heading {
   display: flex;
   justify-content: space-between;
