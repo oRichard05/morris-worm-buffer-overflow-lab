@@ -1,31 +1,46 @@
 # Morris Worm: Stack Buffer Overflow Lab
 
-An interactive learning project for **COMP 211 Checkoff 3**, focused on **stack buffer overflows and memory safety in C**.
+An interactive learning project for **COMP 211 Checkoff 3** about stack buffer overflows and memory safety in C.
 
 ## Concept
 
 **Can You Hack a 1988 Computer?**
 
-The planned presentation is a guided, approximately six-minute demonstration inspired by the `fingerd` vulnerability exploited by the 1988 Morris Worm:
+This project explores how a memory error can change a program's behavior, using the 1988 Morris Worm as historical context. The presentation is designed as a guided demonstration: use the program, trigger the flaw, inspect memory, and test a fix.
 
-1. Explore a fictional, historical-style UNIX user information service.
-2. Observe how an unexpectedly long input can cause a memory-safety failure in a small, deliberately vulnerable **local C demonstration**.
-3. Investigate the underlying stack buffer overflow using a clearly labeled educational memory visualization.
-4. Compare vulnerable behavior with a corrected, length-checked implementation.
-5. Explain the historical incident, the actual repairs, and the broader lesson for memory-safe programming.
+## Run the C lab
 
-**Historical accuracy:** This project is a teaching reconstruction, **not** the original `fingerd` program, the Morris Worm, or an exact reproduction of the 1988 exploit. The Morris Worm used several methods to spread; this project focuses only on its stack-buffer-overflow connection.
+Requirements: a C compiler (`cc`) and `make`.
 
-## Planned components
+```sh
+cd lab
+make
+./vulnerable alice
+./vulnerable AAAAAAAAAAAAAAAAADMIN
+./patched AAAAAAAAAAAAAAAAADMIN
+```
 
-- **C lab:** a small, intentionally vulnerable demonstration and a patched version, runnable locally in a controlled environment.
-- **Interactive interface:** a retro terminal view and a guided memory inspector.
-- **Presentation materials:** student-authored slides for a 5–7 minute talk and Q&A.
-- **Documentation:** instructions to reproduce the educational experiments, references, and findings.
+The first command uses a normal name: the role stays `GUEST` and the vault remains locked. In the vulnerable program, a longer input can overwrite the adjacent `role` field, changing it to `ADMIN`. The patched program checks the input length and rejects that same input.
 
-## Status
+Each program also prints the underlying 24 bytes of the local `Session` structure in hexadecimal. The first 16 bytes represent the name buffer; the final 8 bytes represent the role.
 
-Project planning / initial setup. Implementation and experiment results will be documented as they are completed and verified.
+**Important:** This is a deliberately simplified, local demonstration of a stack buffer overflow. It uses an unchecked `strcpy` to make adjacent-data corruption visible. The original `fingerd` vulnerability involved unsafe input handling and could lead to control-flow hijacking; it did **not** work by changing a `GUEST` field to `ADMIN`. The programs here are not copies of the original `fingerd` or Morris Worm.
+
+To remove the compiled programs:
+
+```sh
+make clean
+```
+
+## Presentation plan
+
+1. Introduce a fictional UNIX-style user information service.
+2. Demonstrate normal and unexpected program behavior.
+3. Examine the stack memory representation.
+4. Explain the historical `fingerd` vulnerability and the 1988 Morris Worm.
+5. Test a corrected implementation and discuss memory safety.
+
+The interactive browser interface and student-authored presentation slides are planned additions.
 
 ## References
 
@@ -34,6 +49,6 @@ Project planning / initial setup. Implementation and experiment results will be 
 - [FBI: Morris Worm](https://www.fbi.gov/history/cases-and-criminals/morris-worm)
 - [Eugene Spafford, *The Internet Worm Program: An Analysis*](https://docs.lib.purdue.edu/cstech/702/)
 
-## Safety and scope
+## Scope
 
-All vulnerability experiments are intended for local, controlled educational use. No original worm, self-propagation, external targets, or intentionally vulnerable public service will be deployed. Any visualized memory layout will be identified as illustrative unless directly measured from the demo.
+The C examples are for controlled, local educational use. No self-propagating code or public vulnerable service is included. Any future visualization of the memory layout will be identified as illustrative unless derived directly from the demonstration's output.
