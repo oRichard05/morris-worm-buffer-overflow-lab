@@ -1,0 +1,6 @@
+.DS_Store
+lab/vulnerable
+lab/patched
+node_modules/
+dist/
+.env
