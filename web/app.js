@@ -1,128 +1,103 @@
-const input = document.getElementById('name-input');
-const screen = document.getElementById('terminal-screen');
-const runButton = document.getElementById('run-button');
-const roleValue = document.getElementById('role-value');
-const vaultValue = document.getElementById('vault-value');
-const roleDetail = document.getElementById('role-detail');
-const vaultDetail = document.getElementById('vault-detail');
-const outcome = document.getElementById('outcome');
+const terminalView = document.getElementById('terminal-view');
+const output = document.getElementById('terminal-output');
+const form = document.getElementById('command-form');
+const input = document.getElementById('command-input');
+const analysisView = document.getElementById('analysis-view');
 const memoryGrid = document.getElementById('memory-grid');
-const memoryExplain = document.getElementById('memory-explain');
-const memoryLabel = document.getElementById('memory-label');
-const backendStatus = document.getElementById('backend-status');
-const modeButtons = {
-  vulnerable: document.getElementById('vulnerable-button'),
-  patched: document.getElementById('patched-button')
-};
-const normal = 'alice';
-const crafted = 'AAAAAAAAAAAAAAAAADMIN';
+
 let mode = 'vulnerable';
+let lastResult = null;
+let lastInput = '';
 let running = false;
+let commandHistory = [];
+let historyIndex = 0;
 
-function terminalLine(message, kind = '') {
+function print(text = '', className = '') {
   const line = document.createElement('div');
-  line.className = `term-line ${kind}`;
-  line.textContent = message;
-  screen.append(line);
-  while (screen.children.length > 85) screen.firstElementChild.remove();
-  screen.scrollTop = screen.scrollHeight;
+  line.className = 'term-line' + (className ? ' ' + className : '');
+  line.textContent = text;
+  output.append(line);
+  if (output.children.length > 200) output.firstElementChild.remove();
+  window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
 }
 
-function setMessage(kind, title, message) {
-  outcome.className = `outcome ${kind}`;
-  outcome.querySelector('.outcome-symbol').textContent = kind === 'danger' ? '⚠' : kind === 'safe' ? '✓' : '◉';
-  outcome.querySelector('strong').textContent = title;
-  outcome.querySelector('p').textContent = message;
+function printLines(lines, className = '') {
+  for (const line of lines) print(line, className);
 }
 
-function setMode(next) {
-  mode = next;
-  for (const [key, button] of Object.entries(modeButtons)) {
-    const active = key === next;
-    button.classList.toggle('active', active);
-    button.setAttribute('aria-pressed', String(active));
+function boot() {
+  output.replaceChildren();
+  printLines([
+    '4.3BSD UNIX (research-vax) (tty00)',
+    '',
+    'login: guest',
+    'Last login: Wed Nov  2 08:42:17 1988',
+    ''
+  ]);
+}
+
+function showTerminal() {
+  analysisView.hidden = true;
+  terminalView.hidden = false;
+  input.focus();
+}
+
+function showAnalysis() {
+  if (!lastResult) {
+    print('inspect: run finger first');
+    return;
   }
-  terminalLine(`Version selected: ${next.toUpperCase()}`, 'dim');
+  terminalView.hidden = true;
+  analysisView.hidden = false;
+  drawMemory();
+  window.scrollTo(0, 0);
 }
 
-function asciiDisplay(hex) {
-  const value = parseInt(hex, 16);
-  if (value === 0) return '␀';
-  return value >= 32 && value <= 126 ? String.fromCharCode(value) : '·';
-}
-
-function showMemory(result, name) {
+function drawMemory() {
   memoryGrid.replaceChildren();
-  result.memory.forEach((hex, index) => {
+  const bytes = lastResult.memory;
+  for (let index = 0; index < bytes.length; index++) {
+    const hex = bytes[index];
+    const value = Number.parseInt(hex, 16);
     const cell = document.createElement('div');
-    const inRole = index >= 16;
-    const overwritten = inRole && result.mode === 'vulnerable' && name.length >= 16 && index <= name.length;
-    cell.className = `byte${inRole ? ' role' : ''}${overwritten ? ' overwritten' : ''}`;
-    cell.title = `Offset ${String(index).padStart(2, '0')}: 0x${hex} (${asciiDisplay(hex)})`;
-    const value = document.createElement('span');
-    value.className = 'hex';
-    value.textContent = hex;
-    const char = document.createElement('span');
-    char.className = 'char';
-    char.textContent = asciiDisplay(hex);
-    cell.append(value, char);
+    const role = index >= 16;
+    const changed = role && lastResult.mode === 'vulnerable' &&
+      lastResult.status !== 'INPUT REJECTED' && index <= lastInput.length;
+    cell.className = 'memory-byte' + (role ? ' role' : '') + (changed ? ' overwritten' : '');
+    const code = document.createElement('span');
+    code.className = 'hex';
+    code.textContent = hex;
+    const character = document.createElement('span');
+    character.className = 'char';
+    character.textContent = value === 0 ? '␀' :
+      value >= 32 && value <= 126 ? String.fromCharCode(value) : '·';
+    cell.title = 'Offset ' + index + ', 0x' + hex;
+    cell.append(code, character);
     memoryGrid.append(cell);
-  });
-  memoryLabel.textContent = `24 BYTES / ${result.mode.toUpperCase()}`;
-  if (result.status === 'INPUT REJECTED') {
-    memoryExplain.textContent = 'The patched program checked the length before copying. The original GUEST role bytes are unchanged.';
-  } else if (result.mode === 'vulnerable' && name.length >= 16) {
-    memoryExplain.textContent = `The name buffer ends at offset 15. The input writes into the adjacent role field beginning at offset 16. The highlighted bytes come from the C program's memory dump. This is a controlled byte-level model: the writes cross the 16-byte name boundary but stay inside the 24-byte session object.`;
-  } else {
-    memoryExplain.textContent = 'The name fits inside the 16-byte buffer, including its terminating zero byte. The neighboring role remains GUEST.';
   }
+
+  const rejected = lastResult.status === 'INPUT REJECTED';
+  document.getElementById('analysis-intro').textContent = rejected
+    ? 'The patched C program rejected the long input before copying it.'
+    : lastResult.role === 'ADMIN'
+      ? 'A long input crossed the 16-byte name field and changed the adjacent role field.'
+      : 'This is the 24-byte session object returned by the C program.';
+  document.getElementById('memory-summary').textContent =
+    'Final bytes returned by C · ' + lastResult.mode.toUpperCase();
+  document.getElementById('analysis-note').textContent = rejected
+    ? 'The role still contains GUEST. The same input no longer changes the session.'
+    : lastResult.mode === 'vulnerable' && lastInput.length >= 16
+      ? 'Bytes at offsets 16 and beyond belong to the role, not the name. The highlighted bytes were overwritten by the request.'
+      : 'The name fits within its allocated field and the role is unchanged.';
 }
 
-function renderResult(result, name) {
-  const unlocked = result.vault === 'UNLOCKED';
-  roleValue.textContent = result.role || '(EMPTY)';
-  vaultValue.textContent = result.vault;
-  roleValue.className = unlocked ? 'bad' : 'good';
-  vaultValue.className = unlocked ? 'bad' : 'good';
-  roleDetail.textContent = unlocked ? 'Role overwritten by input' : 'Educational access flag';
-  vaultDetail.textContent = unlocked ? 'Demonstration resource opened' : 'Resource remains restricted';
-  document.getElementById('input-length').textContent = `${name.length} bytes`;
-  showMemory(result, name);
-  prepareTrace(result, name);
-
-  if (result.status === 'INPUT REJECTED') {
-    setMessage('safe', 'Input rejected by length check', 'The fixed C program prevented the 16-byte name field from being overwritten.');
-    terminalLine('finger: request rejected (input exceeds safe buffer size)', 'success');
-    terminalLine('[LAB MODEL] ROLE: GUEST   RESOURCE: LOCKED', 'dim');
-  } else if (unlocked) {
-    setMessage('danger', 'Memory boundary crossed', 'Our educational model changed the adjacent role field to ADMIN.');
-    terminalLine('*** LOCAL MEMORY DEMONSTRATION: ROLE FIELD CORRUPTED ***', 'error');
-    terminalLine('[LAB MODEL] ROLE: GUEST -> ADMIN', 'error');
-    terminalLine('[LAB MODEL] RESOURCE: LOCKED -> UNLOCKED', 'error');
-    terminalLine('1988 fingerd exploit: control-flow hijack, not a role flag.', 'dim');
-  } else if (name.length >= 16 && mode === 'vulnerable') {
-    setMessage('danger', 'Adjacent data changed', 'The input crossed the logical name buffer boundary.');
-    terminalLine('[LAB MODEL] Adjacent memory modified; resource remains locked.', 'error');
-  } else {
-    setMessage('safe', 'Normal user information request', 'The program completed normally and the role remains GUEST.');
-    terminalLine(`Login name: ${name.padEnd(18)} In real life: [sample record]`);
-    terminalLine('Directory: /usr/guest            Shell: /bin/csh');
-    terminalLine('On since Nov  2 09:12:00 on tty01');
-    terminalLine('No Plan.');
-    terminalLine('[LAB MODEL] ROLE: GUEST   RESOURCE: LOCKED', 'dim');
-  }
-}
-
-async function runDemo() {
-  if (running) return;
-  const name = input.value.trim();
+async function runFinger(name) {
   if (!/^[A-Za-z0-9_-]{1,21}$/.test(name)) {
-    setMessage('danger', 'Invalid input', 'Use 1–21 letters, numbers, underscores, or hyphens.');
+    print('finger: enter 1–21 letters, digits, _ or -');
     return;
   }
   running = true;
-  runButton.disabled = true;
-  terminalLine(`$ finger ${name}`, 'cmd');
+  input.disabled = true;
   try {
     const response = await fetch('/api/run', {
       method: 'POST',
@@ -130,167 +105,138 @@ async function runDemo() {
       body: JSON.stringify({ mode, name })
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Request failed');
-    renderResult(result, name);
+    if (!response.ok) throw new Error(result.error || 'request failed');
+
+    lastResult = result;
+    lastInput = name;
+    if (result.status === 'INPUT REJECTED') {
+      print('finger: input rejected (exceeds name buffer)');
+      print('Lab role: ' + result.role + '   Resource: ' + result.vault);
+    } else if (result.vault === 'UNLOCKED') {
+      print('finger: unexpected internal state');
+      print('Lab role: ' + result.role + '   Resource: ' + result.vault, 'warning');
+      print('Memory boundary crossed. Type inspect to investigate.', 'dim');
+    } else if (name.length >= 16) {
+      print('finger: invalid user information');
+      print('Lab role: ' + (result.role || '(corrupted)') + '   Resource: ' + result.vault, 'warning');
+      print('Type inspect to investigate.', 'dim');
+    } else {
+      print('Login: ' + name.padEnd(19) + ' Name: ' + name);
+      print('Directory: /usr/' + name.padEnd(15) + ' Shell: /bin/csh');
+      print('Last login Wed Nov  2 09:12:00 on tty01');
+      print('No Plan.');
+    }
   } catch (error) {
-    terminalLine(`ERROR: ${error.message}`, 'error');
-    setMessage('danger', 'Unable to run the C demo', error.message);
+    print('finger: ' + error.message, 'warning');
   } finally {
     running = false;
-    runButton.disabled = false;
-    terminalLine('', 'blank');
+    input.disabled = false;
+    input.focus();
   }
 }
 
-document.getElementById('run-form').addEventListener('submit', event => {
+async function runCommand(raw) {
+  const command = raw.trim();
+  if (!command) return;
+  const [operation, ...args] = command.split(/\s+/);
+
+  switch (operation.toLowerCase()) {
+    case 'finger':
+      if (args.length !== 1) {
+        print('usage: finger <username>');
+        return;
+      }
+      await runFinger(args[0]);
+      break;
+    case 'whoami':
+      print('guest');
+      break;
+    case 'date':
+      print('Wed Nov  2 09:12:00 EST 1988');
+      break;
+    case 'help':
+      printLines([
+        'Available commands:',
+        '  finger <username>   Look up a user',
+        '  whoami              Show current user',
+        '  date                Show system date',
+        '  status              Show lab session state',
+        '  inspect             Open memory investigation',
+        '  patch               Enable bounds checking',
+        '  reset               Restore vulnerable demo',
+        '  clear               Clear terminal',
+        '  about               Explain this reconstruction'
+      ]);
+      break;
+    case 'status':
+      print('Local C model: ' + mode);
+      if (lastResult) {
+        print('Last request role: ' + (lastResult.role || '(empty)'));
+        print('Last request resource: ' + lastResult.vault);
+      } else print('No request has been processed.');
+      break;
+    case 'inspect':
+      showAnalysis();
+      break;
+    case 'patch':
+      mode = 'patched';
+      print('Local demonstration updated: bounds checking enabled.');
+      print('Repeat the same finger request to test the fix.');
+      break;
+    case 'reset':
+      mode = 'vulnerable';
+      lastResult = null;
+      lastInput = '';
+      print('Local demonstration reset to the vulnerable version.');
+      break;
+    case 'clear':
+      output.replaceChildren();
+      break;
+    case 'about':
+      print('Historical-style UNIX interface, not an original 1988 installation.');
+      print('The local C lab is a controlled memory-corruption model.');
+      print('It does not reproduce the Morris Worm or its control-flow exploit.');
+      break;
+    default:
+      print(operation + ': Command not found.');
+  }
+}
+
+form.addEventListener('submit', async event => {
   event.preventDefault();
-  runDemo();
-});
-modeButtons.vulnerable.addEventListener('click', () => setMode('vulnerable'));
-modeButtons.patched.addEventListener('click', () => setMode('patched'));
-document.getElementById('normal-preset').addEventListener('click', () => { input.value = normal; input.focus(); });
-document.getElementById('overflow-preset').addEventListener('click', () => { input.value = crafted; input.focus(); });
-document.getElementById('try-patch').addEventListener('click', () => {
-  setMode('patched');
-  input.value = crafted;
-  document.querySelector('.workspace').scrollIntoView({ behavior: 'smooth' });
-  runDemo();
-});
-
-const tabs = [...document.querySelectorAll('[data-view]')];
-for (const tab of tabs) {
-  tab.addEventListener('click', () => {
-    for (const item of tabs) {
-      const selected = item === tab;
-      item.classList.toggle('active', selected);
-      item.setAttribute('aria-selected', String(selected));
-      document.getElementById(`panel-${item.dataset.view}`).hidden = !selected;
-    }
-  });
-}
-
-for (let index = 0; index < 24; index++) {
-  const cell = document.createElement('div');
-  cell.className = `byte placeholder${index >= 16 ? ' role' : ''}`;
-  const hex = document.createElement('span');
-  hex.className = 'hex';
-  hex.textContent = '--';
-  const char = document.createElement('span');
-  char.className = 'char';
-  char.textContent = '·';
-  cell.append(hex, char);
-  memoryGrid.append(cell);
-}
-
-fetch('/api/health').then(response => response.json()).then(result => {
-  if (result.ready) {
-    backendStatus.innerHTML = '<span class="status-light"></span> C LAB READY';
-    runDemo();
-  } else {
-    backendStatus.classList.add('offline');
-    backendStatus.innerHTML = '<span class="status-light"></span> BUILD REQUIRED';
-    setMessage('danger', 'Compile the C programs first', 'Run npm run build:lab in the project directory, then reload.');
+  if (running) return;
+  const command = input.value;
+  input.value = '';
+  print('research-vax% ' + command);
+  if (command.trim()) {
+    commandHistory.push(command);
+    if (commandHistory.length > 50) commandHistory.shift();
+    historyIndex = commandHistory.length;
   }
-}).catch(() => {
-  backendStatus.classList.add('offline');
-  backendStatus.innerHTML = '<span class="status-light"></span> OFFLINE';
-  setMessage('danger', 'Server not available', 'Start the local website using npm start.');
+  await runCommand(command);
 });
 
-
-const initialBytes = Array(16).fill(0).concat([71, 85, 69, 83, 84, 0, 0, 0]);
-let traceWrites = [];
-let tracePosition = 0;
-let traceSnapshot = null;
-let traceTimer = null;
-
-function stopTrace() {
-  if (traceTimer !== null) clearInterval(traceTimer);
-  traceTimer = null;
-  document.getElementById('trace-play').textContent = 'PLAY';
-  document.getElementById('trace-play').classList.remove('playing');
-}
-
-function prepareTrace(result, name) {
-  stopTrace();
-  traceSnapshot = result;
-  traceWrites = result.status === 'INPUT REJECTED' ? [] : [...name].map(char => char.charCodeAt(0)).concat(0);
-  drawTrace(traceWrites.length);
-}
-
-function drawTrace(position) {
-  if (!traceSnapshot) return;
-  tracePosition = Math.max(0, Math.min(position, traceWrites.length));
-  const frame = [...initialBytes];
-  for (let i = 0; i < tracePosition; i++) frame[i] = traceWrites[i];
-  const actual = traceSnapshot.memory.map(value => Number.parseInt(value, 16));
-  const complete = tracePosition === traceWrites.length;
-  const matches = !complete || frame.every((value, index) => value === actual[index]);
-  if (!matches) {
-    stopTrace();
-    memoryExplain.textContent = 'Trace and the C memory snapshot do not match. Do not use this trace as evidence.';
-    return;
+input.addEventListener('keydown', event => {
+  if (event.key === 'ArrowUp' && commandHistory.length) {
+    event.preventDefault();
+    historyIndex = Math.max(0, historyIndex - 1);
+    input.value = commandHistory[historyIndex];
   }
-  [...memoryGrid.children].forEach((cell, index) => {
-    const byte = frame[index];
-    cell.querySelector('.hex').textContent = byte.toString(16).toUpperCase().padStart(2, '0');
-    cell.querySelector('.char').textContent = byte === 0 ? '␀' : byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '·';
-    const changed = index < tracePosition && frame[index] !== initialBytes[index];
-    cell.classList.toggle('trace-written', changed);
-    cell.classList.toggle('active-write', index === tracePosition - 1);
-    cell.classList.remove('overwritten');
-  });
-  document.getElementById('trace-counter').textContent = `${tracePosition} / ${traceWrites.length} bytes`;
-  document.getElementById('trace-next').disabled = tracePosition >= traceWrites.length;
-  document.getElementById('trace-reset').disabled = tracePosition === 0;
-  document.getElementById('trace-play').disabled = traceWrites.length === 0;
-  memoryLabel.textContent = `24 BYTES / ${traceSnapshot.mode.toUpperCase()}`;
-  if (traceSnapshot.status === 'INPUT REJECTED') {
-    memoryExplain.textContent = 'The patched C program rejected the long input before any copy. The GUEST field is unchanged.';
-  } else if (tracePosition === 0) {
-    memoryExplain.textContent = 'Initial state: name is empty and the role contains GUEST. Press NEXT BYTE or PLAY to reconstruct each write.';
-  } else {
-    const offset = tracePosition - 1;
-    memoryExplain.textContent = `Step ${tracePosition}: wrote offset ${offset} ${offset >= 16 ? 'in the adjacent ROLE field, outside the 16-byte name buffer.' : 'inside the NAME buffer.'} This is reconstructed from the C output, not a live debugger trace.`;
+  if (event.key === 'ArrowDown' && commandHistory.length) {
+    event.preventDefault();
+    historyIndex = Math.min(commandHistory.length, historyIndex + 1);
+    input.value = historyIndex === commandHistory.length ? '' : commandHistory[historyIndex];
   }
-  if (complete && traceTimer !== null) stopTrace();
-}
-
-document.getElementById('trace-next').addEventListener('click', () => {
-  stopTrace();
-  drawTrace(tracePosition + 1);
-});
-document.getElementById('trace-reset').addEventListener('click', () => {
-  stopTrace();
-  drawTrace(0);
-});
-document.getElementById('trace-play').addEventListener('click', () => {
-  if (!traceWrites.length) return;
-  if (traceTimer !== null) { stopTrace(); return; }
-  if (tracePosition >= traceWrites.length) drawTrace(0);
-  const button = document.getElementById('trace-play');
-  button.textContent = 'PAUSE';
-  button.classList.add('playing');
-  traceTimer = setInterval(() => drawTrace(tracePosition + 1), 190);
 });
 
-for (const button of document.querySelectorAll('[data-phosphor]')) {
-  button.addEventListener('click', () => {
-    document.body.dataset.phosphor = button.dataset.phosphor;
-    for (const item of document.querySelectorAll('[data-phosphor]')) {
-      item.setAttribute('aria-pressed', String(item === button));
-    }
-  });
-}
-document.getElementById('terminal-focus').addEventListener('click', () => {
-  document.body.classList.toggle('focus-terminal');
-  const active = document.body.classList.contains('focus-terminal');
-  document.getElementById('terminal-focus').textContent = active ? 'EXIT FOCUS (ESC)' : 'FOCUS TERMINAL';
-  input.focus();
-});
+terminalView.addEventListener('click', () => input.focus());
+document.getElementById('return-terminal').addEventListener('click', showTerminal);
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && document.body.classList.contains('focus-terminal')) {
-    document.body.classList.remove('focus-terminal');
-    document.getElementById('terminal-focus').textContent = 'FOCUS TERMINAL';
-  }
+  if (event.key === 'Escape' && !analysisView.hidden) showTerminal();
 });
+
+boot();
+fetch('/api/health').then(response => response.json()).then(result => {
+  if (!result.ready) print('finger: C programs not compiled (run npm run build:lab)', 'warning');
+}).catch(() => print('finger: local service unavailable', 'warning'));
+input.focus();
