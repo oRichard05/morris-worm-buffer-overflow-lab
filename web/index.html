@@ -22,85 +22,49 @@
         </form>
       </section>
 
-      <aside class="trace-panel" aria-label="Animated educational memory model">
-        <div class="panel-top">
-          <span>INSIDE THE COMPUTER</span>
-          <span id="trace-state" aria-live="polite">READY</span>
+      <aside class="trace-panel" aria-label="Live-updating educational memory">
+        <header class="memory-top">
+          <span class="memory-heading">MEMORY</span>
+          <div class="mode-switch" role="group" aria-label="C program version">
+            <button type="button" id="mode-vulnerable" class="active" aria-pressed="true">VULNERABLE</button>
+            <button type="button" id="mode-patched" aria-pressed="false">PATCHED</button>
+          </div>
+        </header>
+
+        <div class="memory-scene">
+          <div class="memory-region-label">
+            <span>NAME</span>
+            <span>16 BYTES</span>
+          </div>
+          <div id="name-bytes" class="memory-cells" aria-label="16 bytes reserved for the name"></div>
+
+          <div id="boundary-line" class="boundary-line">
+            <span class="boundary-stroke"></span>
+            <strong id="boundary-caption">BUFFER LIMIT</strong>
+            <span class="boundary-stroke"></span>
+          </div>
+
+          <div class="memory-region-label">
+            <span>NEXT STEP</span>
+            <span>8 BYTES</span>
+          </div>
+          <div id="next-bytes" class="memory-cells" aria-label="8 bytes immediately after the name buffer"></div>
         </div>
 
-        <section class="next-action" aria-label="Suggested experiment">
-          <span id="guide-step" class="guide-step">01 / START</span>
-          <h2 id="guide-title">Try a normal name</h2>
-          <p id="guide-description" class="guide-description">See how the name fits.</p>
-          <div class="command-suggestion">
-            <code id="guide-command">finger alice@research-vax</code>
-            <button id="guide-run" type="button">RUN <span aria-hidden="true">↵</span></button>
+        <div class="memory-bottom">
+          <div class="memory-reading">
+            <span id="trace-state" class="memory-status" aria-live="polite">READY</span>
+            <span id="trace-count" class="memory-progress">0 / 0</span>
           </div>
-          <button id="inspect-link" class="explain-action" type="button" hidden>SEE WHY IT FAILED <span aria-hidden="true">↗</span></button>
-        </section>
-
-        <section class="memory-stage" aria-label="Memory being filled, one byte at a time">
-          <div class="region-head"><strong>NAME</strong><span>16 SPACES</span></div>
-          <div id="name-bytes" class="memory-cells name-cells" aria-label="16 character spaces reserved for the name"></div>
-          <div id="boundary-line" class="limit-line" aria-live="polite">
-            <span class="limit-rule"></span>
-            <strong id="boundary-caption">16-BYTE LIMIT</strong>
-            <span class="limit-rule"></span>
+          <div class="trace-playback">
+            <button id="trace-play" type="button" disabled>REPLAY <span aria-hidden="true">↻</span></button>
+            <input id="trace-seek" type="range" min="0" max="1" step="1" value="0" disabled aria-label="Playback position in the reconstructed memory write">
           </div>
-          <div class="region-head"><strong>NEXT STEP</strong><span>8 SPACES</span></div>
-          <div id="next-bytes" class="memory-cells next-cells" aria-label="8 neighboring character spaces for the next step"></div>
-        </section>
-
-        <section id="flow-visual" class="execution-section" aria-label="Symbolic outcome of the request">
-          <span class="outcome-label">WHAT THE PROGRAM WOULD DO NEXT</span>
-          <div class="outcome-display">
-            <span class="before-value">RETURN</span>
-            <span class="outcome-arrow" aria-hidden="true">→</span>
-            <strong id="flow-value">—</strong>
-          </div>
-        </section>
-
-        <section class="trace-playback" aria-label="Memory write replay">
-          <div class="playback-top">
-            <span id="trace-caption" aria-live="polite">Run the example to watch the memory fill.</span>
-            <span id="trace-count">0 / 0</span>
-          </div>
-          <div class="playback-controls">
-            <button id="trace-play" type="button" disabled>REPLAY</button>
-            <input id="trace-seek" type="range" min="0" max="1" step="1" value="0" disabled aria-label="Move through the reconstructed byte writes">
-          </div>
-        </section>
-
-        <p id="byte-info" class="byte-info" hidden></p>
-        <p id="trace-source" class="sr-only">BEFORE INPUT</p>
-        <p id="input-preview" class="sr-only">—</p>
-        <p id="input-length" class="sr-only">0 B</p>
-        <p class="trace-foot">Educational C model · not the original 1988 memory layout or a live debugger.</p>
+          <p id="byte-info" class="byte-info" hidden></p>
+        </div>
       </aside>
     </div>
   </main>
 
-  <main id="analysis-view" class="analysis-view" hidden>
-    <div class="analysis">
-      <button id="back-terminal" class="back-button" type="button">← Return to terminal</button>
-      <span class="eyebrow-small">THE 1988 INCIDENT / EXPLAINED</span>
-      <h1>How a name changed the program's next step</h1>
-      <p class="analysis-intro">A short reconstruction of the memory error that helped the Morris Worm spread.</p>
-      <section class="lesson">
-        <div class="lesson-meta"><span id="lesson-count">01 / 04</span><span>MEMORY MODEL</span></div>
-        <h2 id="lesson-title"></h2>
-        <p id="lesson-text"></p>
-        <div id="lesson-memory" class="lesson-memory" aria-label="Memory visualization for the current explanation"></div>
-        <div class="lesson-key"><span>NAME / 16 BYTES</span><span>NEXT STEP / 8 BYTES</span></div>
-        <p id="lesson-note" class="lesson-note"></p>
-        <div class="lesson-actions">
-          <button id="lesson-previous" class="back-button" type="button">← Previous</button>
-          <button id="lesson-reset" class="back-button" type="button" hidden>Reset model</button>
-          <button id="lesson-next" class="primary-action" type="button">Next →</button>
-        </div>
-      </section>
-      <p class="sources">Historical references: <a href="https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html" target="_blank" rel="noopener noreferrer">4.3BSD fingerd source</a> · <a href="https://datatracker.ietf.org/doc/html/rfc1135" target="_blank" rel="noopener noreferrer">RFC 1135</a></p>
-    </div>
-  </main>
 </body>
 </html>
