@@ -159,7 +159,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #eee; outline-off
 }
 #replay-button:hover { background: #303741; }
 .memory-explanation { min-height: 2em; margin: 18px 0 0; font-size: 14px; }
-.step-actions { margin-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.step-actions { margin-top: 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
 .primary-button {
   color: #101216;
   background: #e5e8ed;
@@ -170,10 +170,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #eee; outline-off
   padding: 12px 17px;
 }
 .primary-button:hover { background: #fff; }
-.case-note { border-top: 1px solid var(--line); margin-top: 35px; padding-top: 22px; }
-.case-note p { max-width: 850px; }
-.case-note a { color: #e7ebef; }
-.actions { border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding-top: 25px; margin-top: 30px; }
+.sources { margin: 16px 4px 0; line-height: 1.8; }
+.sources a { color: #e7ebef; text-underline-offset: 3px; }
 @media (max-width: 860px) {
   .memory-grid { grid-template-columns: repeat(8,minmax(0,1fr)); }
   .memory-byte { min-height: 46px; }
