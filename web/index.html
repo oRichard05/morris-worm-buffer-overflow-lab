@@ -25,7 +25,7 @@
       <button id="return-terminal" class="text-button" type="button">← Back to terminal</button>
       <p class="eyebrow">WHAT HAPPENED?</p>
       <h1>One input. Two memory regions.</h1>
-      <p class="intro">The computer expected a user name. Our C example shows how a long input can change data that was supposed to stay untouched.</p>
+      <p class="intro">A user-name request was longer than the space reserved for it. Here's what happened inside our C example.</p>
 
       <section class="lesson">
         <div class="lesson-header">
@@ -46,20 +46,11 @@
         <p id="memory-explanation" class="memory-explanation"></p>
         <div class="step-actions">
           <button id="step-previous" type="button" class="text-button" disabled>← Previous</button>
+          <button id="reset-demo" class="text-button" type="button" hidden>Reset experiment</button>
           <button id="step-next" type="button" class="primary-button">Next →</button>
         </div>
       </section>
-
-      <section class="case-note">
-        <h2>The connection to 1988</h2>
-        <p>The real <code>fingerd</code> service used a 512-byte buffer and a C function called <code>gets()</code>, which did not check the input length. The Morris Worm exploited that error to redirect execution. Our example uses a much smaller buffer and changes a neighboring role field so the problem is easier to see. It does <strong>not</strong> recreate the original attack.</p>
-        <p class="sources">Sources: <a href="https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html" target="_blank" rel="noopener noreferrer">Original 4.3BSD code</a> · <a href="https://datatracker.ietf.org/doc/html/rfc1135" target="_blank" rel="noopener noreferrer">RFC 1135</a></p>
-      </section>
-
-      <div class="actions">
-        <button id="apply-patch" class="primary-button" type="button">Try the corrected version</button>
-        <button id="reset-demo" class="text-button" type="button">Use vulnerable version</button>
-      </div>
+      <p class="sources">Historical sources: <a href="https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html" target="_blank" rel="noopener noreferrer">Original 4.3BSD fingerd</a> · <a href="https://datatracker.ietf.org/doc/html/rfc1135" target="_blank" rel="noopener noreferrer">RFC 1135</a></p>
     </div>
   </main>
 </body>
