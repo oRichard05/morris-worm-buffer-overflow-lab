@@ -1,40 +1,39 @@
 # Morris Worm · Buffer Overflow Lab
 
-A local, classroom-safe demonstration of the memory-boundary problem behind the 1988 Morris Worm's exploitation of the UNIX `fingerd` service.
+A local, classroom-safe reconstruction of a memory-boundary failure inspired by the `fingerd` vulnerability exploited by the Morris Worm in 1988.
 
 ## Run
 
-Requires Node.js 18+, a C compiler, and `make`.
+Requires Node.js 18+, `make`, and a C compiler.
 
 ```sh
 npm start
 ```
 
-Open **http://127.0.0.1:4173**. `npm start` rebuilds the local C examples automatically. Run `npm test` to check the C models.
+Open **http://127.0.0.1:4173**. The command automatically rebuilds both C examples. To check the C programs, run `npm test`.
 
 ## Presentation
 
-The screen intentionally contains only two views: a reconstructed 4.3BSD-style UNIX terminal on the left, and a large animated **memory visualization** on the right. There is no tutorial, suggested-command widget, or explanation screen; the presenter narrates what happens.
+The left half is a simple black-and-white, 4.3BSD-inspired terminal. The right half is **only memory**, without a scripted tutorial or explanatory page.
 
-Use the terminal to send a remote `finger` request. These three commands show the difference:
+The memory display now has two interactive scales: a **continuous 24-byte address ribbon** showing where the program writes, and an **eight-byte magnifier**. The white vertical line marks the end of the 16-byte name buffer. The eight bytes to the right are adjacent memory initialized to `Z` (`0x5A`).
 
-```sh
+Click any position on the ribbon to examine its eight-byte group. Click a large character in the magnifier to inspect the exact address and hex value. During execution, the magnifier follows the write pointer; you can use **REPLAY** or drag the timeline to replay or scrub the writes.
+
+Suggested commands for a presenter to type in the terminal:
+
+```text
 finger alice@research-vax
-finger AAAAAAAAAAAAAAAADIVERT@research-vax
-finger AAAAAAAAAAAAAAAADIVERT@research-vax
+finger AAAAAAAAAAAAAAAABBBBBB@research-vax
 ```
 
-For the third request, select **PATCHED** in the memory display before running the command again. The memory clears when switching between **VULNERABLE** and **PATCHED**.
+The first uses a short name, so adjacent memory remains unchanged. The second uses 16 `A` characters followed by 6 `B` characters, which overwrites 7 bytes of adjacent memory, including the terminating zero byte. The overflow turns those affected bytes orange. Select **PATCHED** and repeat the second command: the input is rejected and adjacent memory stays intact.
 
-The memory view depicts a 24-byte C stack object with a 16-byte `name` field and an adjacent 8-byte `next_step` field. One large cell represents one byte. A normal name fits; a longer name crosses the marked boundary and overwrites neighboring bytes. A patched program rejects the long name before copying.
+## Technical scope
 
-Replay and the playback slider allow the presenter to revisit individual writes. Selecting any byte reveals its offset and hexadecimal value. The animation reconstructs writes **after the C program finishes**, and verifies the reconstructed final values against the program's output. It is not a live debugger trace.
+The local C model uses one 24-byte stack object with a 16-byte name array and an eight-byte neighboring array. The vulnerable example copies at most 23 bytes, so it crosses the *logical field boundary* without escaping the enclosing object. The patched version checks the length before copying. Actual final bytes come from the compiled C program; the browser reconstructs the individual writes and verifies that its reconstructed result matches the C output before replaying them.
 
-## Historical scope
-
-In 1988, the real 4.3BSD `fingerd` used an unchecked input routine with a 512-byte stack buffer. The Morris Worm exploited that vulnerability on vulnerable VAX systems to redirect real execution.
-
-This project does **not** recreate the original worm, execute code through a return address, emulate a VAX, or expose a network attack surface. The `RETURN` and `DIVERT` labels are symbolic data in the C model, not machine instruction pointers. The vulnerable model crosses the logical boundary between fields while staying within the enclosing 24-byte object. The server binds to `127.0.0.1` only.
+The real 4.3BSD `fingerd` used an unchecked input operation with a 512-byte stack buffer. In 1988, that flaw was exploited by the Morris Worm to redirect control flow on vulnerable VAX systems. Our safe illustration shows **adjacent-data corruption only**—not a historical binary, return-address overwrite, or executable worm. The server binds to `127.0.0.1` and does not expose a vulnerable network service.
 
 ## References
 
