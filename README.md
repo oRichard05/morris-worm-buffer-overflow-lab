@@ -20,6 +20,8 @@ Open http://127.0.0.1:4173. The local server does not accept public network conn
 
 The high-contrast, black-and-white screen represents a **4.3BSD UNIX shell session**. `fingerd` itself was a network daemon, not a separate menu program. On a real UNIX system, users interacted with it using the command `finger user@host`.
 
+A small **Lab Guide** beside the terminal suggests one command at a time. Click **Insert command**, then press **Enter** to run it; the button does not execute anything automatically. After each remote query, the **Memory Inspector** updates with the real 24-byte snapshot returned by the local C executable: 16 bytes for the name and 8 for the adjacent role. Changed role bytes are highlighted. It is a snapshot **after each execution**, not continuous live memory streaming or a historical debugger. The guide and memory pane are modern educational additions; the terminal text itself remains 1988-style.
+
 Try these commands:
 
 ```text
