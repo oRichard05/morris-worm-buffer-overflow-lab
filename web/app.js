@@ -1,6 +1,4 @@
 const $ = id => document.getElementById(id);
-const terminalView = $('terminal-view');
-const analysisView = $('analysis-view');
 const output = $('terminal-output');
 const screen = $('glass');
 const form = $('command-form');
@@ -18,19 +16,15 @@ const users = {
   bsmith: { name: 'Brian Smith', tty: 'tty02', home: '/usr/bsmith' },
   guest: { name: 'Guest User', tty: 'tty00', home: '/usr/guest' }
 };
-const payload = 'AAAAAAAAAAAAAAAADIVERT';
 let mode = 'vulnerable';
 let lastResult = null;
-let lastName = '';
 let running = false;
-let format = 'ascii';
 let selectedByte = null;
 let bytes = initialFrame();
 let writes = [];
 let position = 0;
 let traceTimer = null;
 let replayVerified = false;
-let lessonStep = 0;
 const history = [];
 let historyIndex = 0;
 
@@ -38,7 +32,6 @@ function initialFrame() {
   return Array(16).fill(0).concat([82, 69, 84, 85, 82, 78, 0, 0]);
 }
 function byteText(number) {
-  if (format === 'hex') return number.toString(16).padStart(2, '0').toUpperCase();
   if (number === 0) return '·';
   return number >= 32 && number <= 126 ? String.fromCharCode(number) : '·';
 }
@@ -101,7 +94,6 @@ async function remoteFinger(name) {
   syncTerminalCursor();
   stopTrace();
   $('trace-state').textContent = 'RUNNING C';
-  $('trace-source').textContent = 'AWAITING RESULT';
   try {
     const response = await fetch('/api/run', {
       method: 'POST',
@@ -114,9 +106,7 @@ async function remoteFinger(name) {
       throw new Error('C program returned an unexpected memory layout');
     }
     lastResult = data;
-    lastName = name;
     useResult(data, name);
-    updateGuide();
     if (data.status === 'INPUT REJECTED') {
       writeLine('finger: remote request rejected');
     } else if (data.flow === 'DIVERTED' || data.flow === 'CORRUPTED') {
@@ -127,7 +117,6 @@ async function remoteFinger(name) {
   } catch (error) {
     writeLine('finger: ' + error.message);
     $('trace-state').textContent = 'SERVICE ERROR';
-    $('trace-source').textContent = 'NO NEW SNAPSHOT';
   } finally {
     running = false;
     input.disabled = false;
@@ -278,46 +267,28 @@ function renderMemoryCell(index, baseline, crossed) {
 
 function renderTrace() {
   const baseline = initialFrame();
+  const rejected = Boolean(lastResult && lastResult.status === 'INPUT REJECTED');
   const crossed = replayVerified && position > 16;
-  const finishing = Boolean(lastResult &&
-    (lastResult.status === 'INPUT REJECTED' || position >= writes.length));
-  const changed = Boolean(lastResult && finishing &&
-    bytes.slice(16).some((value, index) => value !== baseline[16 + index]));
+  const finished = Boolean(lastResult && (rejected || position >= writes.length));
+  const overwritten = finished && bytes.slice(16).some((byte, index) => byte !== baseline[16 + index]);
 
   tracePanel.classList.toggle('is-crossing', crossed);
-  $('flow-visual').classList.toggle('is-diverted',
-    Boolean(lastResult && finishing && lastResult.flow === 'DIVERTED'));
-
+  tracePanel.classList.toggle('is-rejected', rejected);
   nameBytes.replaceChildren();
   nextBytes.replaceChildren();
   for (let i = 0; i < 24; i++) {
     (i < 16 ? nameBytes : nextBytes).append(renderMemoryCell(i, baseline, crossed));
   }
 
-  $('boundary-caption').textContent = crossed ? 'OVERFLOW! 16-BYTE LIMIT' : '16-BYTE LIMIT';
-  $('flow-value').textContent = !lastResult ? '—'
-    : lastResult.status === 'INPUT REJECTED' ? 'RETURN'
-    : !finishing && crossed ? 'WRITING…'
-    : finishing ? lastResult.next || '?' : 'RETURN';
-
+  $('boundary-caption').textContent = rejected ? 'BLOCKED'
+    : crossed ? 'OVERFLOW' : 'BUFFER LIMIT';
+  $('trace-state').textContent = !lastResult ? 'READY'
+    : rejected ? 'BLOCKED'
+    : !finished && crossed ? 'OVERFLOW'
+    : !finished && position > 0 ? 'WRITING'
+    : overwritten ? 'OVERWRITTEN' : finished ? 'COMPLETE' : 'READY';
   $('trace-count').textContent = position + ' / ' + writes.length;
   traceSeek.value = String(position);
-  $('trace-state').textContent = !lastResult ? 'READY'
-    : lastResult.status === 'INPUT REJECTED' ? 'BLOCKED'
-    : !finishing && crossed ? 'OVERFLOW'
-    : !finishing && position > 0 ? 'WRITING'
-    : changed ? 'ALTERED' : finishing ? 'COMPLETE' : 'READY';
-
-  $('trace-caption').textContent = !lastResult ? 'Run the example to watch the memory fill.'
-    : lastResult.status === 'INPUT REJECTED' ? 'Stopped before the memory was changed.'
-    : !finishing && crossed ? 'The input has passed the buffer limit!'
-    : !finishing ? 'Writing the input, one byte at a time…'
-    : lastResult.flow === 'DIVERTED' ? 'The next step was changed.'
-    : 'The next step stayed unchanged.';
-
-  $('trace-source').textContent = !lastResult ? 'BEFORE INPUT'
-    : lastResult.status === 'INPUT REJECTED' ? 'PATCHED / C RESULT'
-    : replayVerified ? 'VERIFIED C REPLAY' : 'C RESULT';
 }
 
 function setTracePosition(next) {
@@ -329,36 +300,35 @@ function playTrace() {
   if (!replayVerified || !lastResult || !writes.length) return;
   if (traceTimer !== null) {
     stopTrace();
-    tracePlay.textContent = 'Play';
+    tracePlay.textContent = 'PLAY ▶';
     return;
   }
   if (position >= writes.length) setTracePosition(0);
-  tracePlay.textContent = 'Pause';
+  tracePlay.textContent = 'PAUSE Ⅱ';
   traceTimer = setInterval(() => {
     setTracePosition(position + 1);
     if (position >= writes.length) {
       stopTrace();
-      tracePlay.textContent = 'Replay';
+      tracePlay.textContent = 'REPLAY ↻';
     }
-  }, 150);
+  }, 170);
 }
 function useResult(result, name) {
   stopTrace();
   selectedByte = null;
   $('byte-info').hidden = true;
-  $('input-preview').textContent = name;
-  $('input-length').textContent = name.length + ' CHARS + END BYTE';
+
   const target = result.memory.map(hex => Number.parseInt(hex, 16));
   const rejected = result.status === 'INPUT REJECTED';
-  writes = rejected ? [] : [...name].map(char => char.charCodeAt(0)).concat(0);
-  const expected = reconstructedFrame(writes.length);
-  replayVerified = !rejected && expected.every((byte, index) => byte === target[index]);
+  writes = rejected ? [] : [...name].map(character => character.charCodeAt(0)).concat(0);
+  const calculated = reconstructedFrame(writes.length);
+  replayVerified = !rejected && calculated.every((byte, index) => byte === target[index]);
   position = 0;
 
   traceSeek.max = String(writes.length || 1);
   traceSeek.disabled = !replayVerified;
   tracePlay.disabled = !replayVerified;
-  tracePlay.textContent = 'Replay';
+  tracePlay.textContent = 'REPLAY ↻';
 
   if (rejected || !replayVerified) {
     bytes = target;
@@ -369,179 +339,47 @@ function useResult(result, name) {
   renderTrace();
   if (replayVerified) playTrace();
 }
+
 tracePlay.addEventListener('click', playTrace);
 traceSeek.addEventListener('input', () => {
   if (!replayVerified) return;
   stopTrace();
-  tracePlay.textContent = 'Play';
+  tracePlay.textContent = 'PLAY ▶';
   setTracePosition(Number(traceSeek.value));
 });
 
-function updateGuide() {
-  let label, title, description, command = '';
-  const hasLong = Boolean(lastResult && lastName.length >= 16);
-  if (mode === 'patched' && hasLong) {
-    label = '04 / PROTECTED'; title = 'The copy was stopped';
-    description = 'Same request. The next step stayed RETURN.';
-  } else if (mode === 'patched') {
-    label = '04 / COMPARE'; title = 'Test the fix';
-    description = 'Run the same long request with the length check.';
-    command = 'finger ' + payload + '@research-vax';
-  } else if (hasLong) {
-    label = '03 / OVERFLOW'; title = 'The input crossed the limit';
-    description = 'Watch the memory change below.';
-  } else if (lastResult) {
-    label = '02 / OVERFLOW'; title = 'Now overflow the buffer';
-    description = 'Send a name that is too long.';
-    command = 'finger ' + payload + '@research-vax';
-  } else {
-    label = '01 / START'; title = 'Start with a short name';
-    description = 'Watch the memory fill.';
-    command = 'finger alice@research-vax';
-  }
-  $('guide-step').textContent = label;
-  $('guide-title').textContent = title;
-  $('guide-description').textContent = description;
-  $('guide-command').textContent = command;
-  $('guide-command').hidden = !command;
-  $('guide-run').hidden = !command;
-  $('inspect-link').hidden = !hasLong;
-}
-$('guide-run').addEventListener('click', async () => {
-  const cmd = $('guide-command').textContent;
-  if (!cmd || running) return;
-  const button = $('guide-run');
-  button.disabled = true;
-  try { await submitCommand(cmd); }
-  finally { button.disabled = false; input.focus(); }
-});
-
-function showAnalysis() {
-  if (!lastResult) return;
+function setMode(nextMode) {
+  if (mode === nextMode) return;
   stopTrace();
-  lessonStep = 0;
-  drawLesson();
-  terminalView.hidden = true;
-  analysisView.hidden = false;
-  window.scrollTo(0, 0);
-}
-function closeAnalysis() {
-  analysisView.hidden = true;
-  terminalView.hidden = false;
-  input.focus();
-}
-function drawLesson() {
-  if (!lastResult) return;
-  const rejected = lastResult.status === 'INPUT REJECTED';
-  const long = lastName.length >= 16;
-  const actual = lastResult.memory.map(hex => Number.parseInt(hex, 16));
-  let current = initialFrame();
-  if (lessonStep === 1) {
-    const first = [...lastName].map(char => char.charCodeAt(0)).concat(0);
-    for (let i = 0; i < Math.min(16, first.length); i++) current[i] = first[i];
-  }
-  if (lessonStep >= 2) current = actual;
-
-  const steps = [
-    {
-      title: 'A fixed amount of space',
-      description: 'The local C model reserves 16 bytes for a name. The next 8 bytes hold a label describing what the program would do next.',
-      note: 'These are neighboring fields of one C stack object, not the original 1988 machine layout.'
-    },
-    {
-      title: long ? 'The request does not fit' : 'The request fits',
-      description: lastName.length + ' characters need ' + (lastName.length + 1) + ' bytes with the end marker. The name field has only 16.',
-      note: rejected ? 'This is only a preview. The corrected program rejected the input before copying it.'
-        : 'Notice where the name ends and the next field begins.'
-    },
-    {
-      title: rejected ? 'The length check prevents the write' : long ? 'The copy reaches the next field' : 'The next field stays unchanged',
-      description: rejected ? 'The corrected program refused the oversized input. No neighboring bytes were touched.'
-        : long ? 'The unchecked write changed the symbolic next step from RETURN to ' + lastResult.next + '.'
-          : 'The string ended before reaching the boundary.',
-      note: rejected ? 'The next-step field still contains RETURN.'
-        : 'The main inspector replays these bytes individually, using the result returned by C.'
-    },
-    {
-      title: 'What really happened in 1988',
-      description: 'The historical 4.3BSD fingerd used gets() with a 512-byte stack buffer and did not check the incoming line length. The Morris Worm exploited this flaw on vulnerable VAX systems to redirect real execution.',
-      note: 'Our model changes data representing a next step. It does not overwrite an actual return address or execute the worm.'
-    }
-  ];
-  const detail = steps[lessonStep];
-  $('lesson-count').textContent = String(lessonStep + 1).padStart(2, '0') + ' / 04';
-  $('lesson-title').textContent = detail.title;
-  $('lesson-text').textContent = detail.description;
-  $('lesson-note').textContent = detail.note;
-  $('lesson-memory').replaceChildren();
-  current.forEach((value, index) => {
-    const cell = document.createElement('div');
-    cell.className = 'lesson-byte' + (index >= 16 ? ' next' : '')
-      + (lessonStep >= 2 && !rejected && index >= 16 && value !== initialFrame()[index] ? ' overwritten' : '');
-    const char = document.createElement('span');
-    char.textContent = value === 0 ? '·' : value >= 32 && value <= 126 ? String.fromCharCode(value) : '·';
-    const addr = document.createElement('small');
-    addr.textContent = index.toString(16).padStart(2, '0').toUpperCase();
-    cell.append(char, addr);
-    $('lesson-memory').append(cell);
-  });
-  $('lesson-previous').disabled = lessonStep === 0;
-  $('lesson-next').textContent = lessonStep < 3 ? 'Next →'
-    : mode === 'vulnerable' ? 'Try the corrected version →' : 'Return to terminal →';
-  $('lesson-reset').hidden = !(lessonStep === 3 && mode === 'patched');
-}
-function switchMode(nextMode) {
-  stopTrace();
-  const previous = lastName;
   mode = nextMode;
   lastResult = null;
-  lastName = '';
+  selectedByte = null;
   writes = [];
   position = 0;
   replayVerified = false;
   bytes = initialFrame();
-  selectedByte = null;
-  $('byte-info').hidden = true;
-  $('input-preview').textContent = 'Awaiting a finger request';
-  $('input-length').textContent = '0 BYTES';
+
+  traceSeek.value = '0';
+  traceSeek.max = '1';
   traceSeek.disabled = true;
   tracePlay.disabled = true;
-  traceSeek.max = '1';
-  tracePlay.textContent = 'Replay';
+  tracePlay.textContent = 'REPLAY ↻';
+  $('byte-info').hidden = true;
+  for (const version of ['vulnerable', 'patched']) {
+    const button = $('mode-' + version);
+    const active = version === mode;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  }
   renderTrace();
-  updateGuide();
-  closeAnalysis();
-  input.value = previous ? 'finger ' + previous + '@research-vax' : '';
+  input.focus();
   syncTerminalCursor();
 }
-$('inspect-link').addEventListener('click', showAnalysis);
-$('back-terminal').addEventListener('click', closeAnalysis);
-$('lesson-previous').addEventListener('click', () => {
-  lessonStep = Math.max(0, lessonStep - 1);
-  drawLesson();
-});
-$('lesson-next').addEventListener('click', () => {
-  if (lessonStep === 3) {
-    if (mode === 'patched') closeAnalysis();
-    else switchMode('patched');
-    return;
-  }
-  lessonStep++;
-  drawLesson();
-});
-$('lesson-reset').addEventListener('click', () => switchMode('vulnerable'));
-document.addEventListener('keydown', event => {
-  if (event.key === 'F2' && analysisView.hidden && lastResult) {
-    event.preventDefault(); showAnalysis();
-  }
-  if (event.key === 'Escape' && !analysisView.hidden) {
-    event.preventDefault(); closeAnalysis();
-  }
-});
+$('mode-vulnerable').addEventListener('click', () => setMode('vulnerable'));
+$('mode-patched').addEventListener('click', () => setMode('patched'));
 
 boot();
 renderTrace();
-updateGuide();
 fetch('/api/health').then(response => response.json()).then(data => {
   if (!data.ready) writeLine('finger: local C models are not compiled (run npm run build:lab)');
 }).catch(() => writeLine('finger: local demonstration unavailable'));
