@@ -1,8 +1,8 @@
-# Morris Worm: Buffer Overflow Lab
+# Morris Worm: 4.3BSD Finger Lab
 
-An interactive C memory-safety project inspired by the 1988 Morris Worm. Developed for COMP 211 Checkoff 3.
+An educational reconstruction of the UNIX `finger`/`fingerd` user-information interface from the era of the 1988 Morris Worm, for COMP 211 Checkoff 3.
 
-## Start the program
+## Run locally
 
 Requirements: Node.js 18+, a C compiler (`cc`), and `make`.
 
@@ -10,64 +10,59 @@ Requirements: Node.js 18+, a C compiler (`cc`), and `make`.
 git clone https://github.com/oRichard05/morris-worm-buffer-overflow-lab.git
 cd morris-worm-buffer-overflow-lab
 npm run build:lab
+npm test
 npm start
 ```
 
-Open [http://127.0.0.1:4173](http://127.0.0.1:4173) in a browser. No third-party packages are needed.
+Open http://127.0.0.1:4173. The local server does not accept public network connections and uses no third-party Node packages.
 
-The program opens directly into a fictional 1988-style UNIX user information system. Navigate by typing menu numbers and pressing Enter.
+## Terminal
 
-## Demonstration sequence
+The screen represents a **4.3BSD UNIX shell session**. `fingerd` itself was a network daemon, not a separate menu program. On a real UNIX system, users interacted with it using the command `finger user@host`.
 
-1. Select **2 — Restricted records**. Access should be denied.
-2. Return to the menu. Select **1 — User directory** and enter `alice` to make a normal request.
-3. Return to **1 — User directory** and enter `AAAAAAAAAAAAAAAAADMIN` (16 A's followed by `ADMIN`).
-4. Return to the menu and select **2 — Restricted records** again. The fictional records are now accessible because the C experiment returned an overwritten `ADMIN` role.
-5. Press **I** to open the separate memory investigation. This view displays the actual 24-byte output from the C program, explanations, historical context, and an option to apply the fix.
-6. Select **Apply fix and return to computer**. Repeat the same long lookup, then try option **2**. Access should remain denied.
+Try these commands:
 
-**Escape** returns to the menu or closes the investigation. **Enter** advances between screens. The menu is intentionally minimal so the security demonstration happens before the technical explanation.
+```text
+finger
+finger alice
+finger -s alice
+finger alice@research-vax
+finger AAAAAAAAAAAAAAAAADMIN@research-vax
+```
 
-## Run the C programs directly
+The first three display period-style user information. The fourth represents a normal remote request to a finger daemon. The final command uses the controlled C demonstration: if the vulnerable model changes its adjacent role field, the **mock remote connection closes unexpectedly**. That output is an educational stand-in for corrupted state, *not* a claim to reproduce the real worm's execution.
+
+After making a remote query, press **F2** (on some Mac keyboards, **Fn + F2**) to open the separate modern memory investigation. There you can compare the bytes from the C program with the original 1988 vulnerability, activate the corrected implementation, and return to the terminal. Try the same remote request again after applying the patch.
+
+Other supported shell-like commands include `who`, `whoami`, `date`, `hostname`, `uname`, `pwd`, `ls`, `cat /etc/motd`, `man finger`, `clear`, and `logout`. This is not a full UNIX shell.
+
+## Source accuracy and limitations
+
+This recreation was built against the 4.3BSD [finger command source](https://retro11.de/ouxr/43bsd/usr/src/ucb/finger.c.html) (revision dated March 13, 1986), [fingerd server source](https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html) (revision dated June 6, 1985), and the [1986 finger manual](https://retro11.de/ouxr/43bsd/usr/man/cat1/finger.0.html).
+
+The authentic command supported short and long user listings, and remote queries of the form `user@host`. The server accepted a line over the network and passed it to the command. Its historical stack buffer flaw was the unbounded read `gets(line)` into a 512-byte array, which the worm exploited to redirect execution on vulnerable VAX systems.
+
+This project **does not run the historical binaries or emulate a VAX**. It uses a small set of fictional users, a reconstructed command interface, and a simplified local C experiment. In the experiment, a 16-byte name field sits beside an 8-byte role field within one 24-byte stack object. The controlled demonstration writes across the name field boundary but stays within the enclosing object. Its `ADMIN` field exists *only inside the model* and **did not exist in the historical `fingerd` attack**. The simulated connection closure is not a recreation of code execution.
+
+The newer corrected C example rejects a name that would exceed its buffer, including the required NUL terminator. The original historical vulnerability was addressed by fixing or disabling vulnerable services; the presentation should not treat this educational patch as an exact reproduction of a particular 1988 vendor patch.
+
+## C experiment
 
 ```sh
-npm run build:lab
 ./lab/vulnerable alice
 ./lab/vulnerable AAAAAAAAAAAAAAAAADMIN
 ./lab/patched AAAAAAAAAAAAAAAAADMIN
 npm test
 ```
 
-The programs print the 24 bytes of a local `Session` object in hexadecimal. The first 16 bytes store the name and the final 8 bytes store the role.
+The `lab` directory contains the two C programs, their Makefile, and the test script. The `web` directory contains the local HTTP server, terminal interface, styles, and separate investigation view.
 
-## Project files
+## Historical references
 
-```text
-lab/
-  vulnerable.c     Controlled memory-boundary demonstration
-  patched.c        Corrected input-length check
-  Makefile         Builds both programs
-  check.sh         Checks expected outcomes
-web/
-  server.mjs       Local HTTP server and C process runner
-  index.html       UNIX-style program and separate investigation
-  app.js           Menu navigation and C-backed requests
-  styles.css       Monochrome terminal styling
-```
+- [4.3BSD finger.c, 1986](https://retro11.de/ouxr/43bsd/usr/src/ucb/finger.c.html)
+- [4.3BSD fingerd.c, 1985](https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html)
+- [4.3BSD finger(1) manual, 1986](https://retro11.de/ouxr/43bsd/usr/man/cat1/finger.0.html)
+- [RFC 1135: The Helminthiasis of the Internet](https://datatracker.ietf.org/doc/html/rfc1135)
+- [MITRE CWE-121: Stack-based Buffer Overflow](https://cwe.mitre.org/data/definitions/121.html)
 
-## Historical background
-
-The Morris Worm spread across parts of the early Internet in November 1988, using several techniques. One was a stack buffer overflow in the UNIX `fingerd` service. The real vulnerability involved unsafe input handling and could change the program's execution flow.
-
-This lab is **not** a reproduction of the original `fingerd` application, worm, or exploit. The terminal menu, restricted records, and `GUEST`/`ADMIN` role are fictional teaching devices. The local C code demonstrates adjacent-field corruption by writing within the byte representation of a single 24-byte stack object, without exceeding the enclosing object. The browser's session authorization is derived from that C result. This makes the experiment reliable without relying on undefined out-of-object writes.
-
-The server binds only to `127.0.0.1`. It is intended for controlled local use, not public hosting.
-
-## References
-
-- [RFC 1135 — The Helminthiasis of the Internet](https://datatracker.ietf.org/doc/html/rfc1135)
-- [The Internet Worm Program: An Analysis — Eugene Spafford](https://docs.lib.purdue.edu/cstech/702/)
-- [FBI — Morris Worm](https://www.fbi.gov/history/cases-and-criminals/morris-worm)
-- [MITRE CWE-121 — Stack-based Buffer Overflow](https://cwe.mitre.org/data/definitions/121.html)
-
-The presentation slides are authored separately by the student, in accordance with the assignment.
+Presentation slides are prepared separately by the student, in accordance with the assignment.
