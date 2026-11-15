@@ -1,0 +1,15 @@
+{
+  "name": "morris-worm-buffer-overflow-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A local interactive demonstration of stack buffer overflows in C",
+  "scripts": {
+    "build:lab": "make -C lab",
+    "start": "node web/server.mjs",
+    "test": "sh lab/check.sh"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
