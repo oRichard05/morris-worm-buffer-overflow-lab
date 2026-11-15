@@ -497,7 +497,9 @@ input.addEventListener('keydown', event => {
     input.value = historyIndex === commands.length ? '' : commands[historyIndex];
   }
 });
-terminalView.addEventListener('click', () => input.focus());
+glass.addEventListener('click', event => {
+  if (event.target !== input) input.focus();
+});
 document.getElementById('return-terminal').addEventListener('click', closeAnalysis);
 document.getElementById('reset-demo').addEventListener('click', () => {
   changeVersion('vulnerable');
