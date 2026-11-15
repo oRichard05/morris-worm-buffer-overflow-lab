@@ -11,7 +11,7 @@ const nextBytes = $('next-bytes');
 const tracePanel = document.querySelector('.trace-panel');
 const traceSeek = $('trace-seek');
 const tracePlay = $('trace-play');
-const traceFormat = $('trace-format');
+const blockCursor = $('terminal-block-cursor');
 
 const users = {
   alice: { name: 'Alice Morgan', tty: 'tty01', home: '/usr/alice' },
@@ -45,6 +45,16 @@ function byteText(number) {
 function byteHex(number) {
   return '0x' + number.toString(16).toUpperCase().padStart(2, '0');
 }
+function syncTerminalCursor() {
+  const index = Number.isInteger(input.selectionStart) ? input.selectionStart : input.value.length;
+  blockCursor.textContent = input.value.charAt(index) || ' ';
+  blockCursor.style.left = 'calc(' + index + 'ch - ' + (input.scrollLeft || 0) + 'px)';
+  blockCursor.hidden = input.disabled;
+}
+['input', 'keyup', 'click', 'focus', 'scroll', 'select'].forEach(eventName => {
+  input.addEventListener(eventName, syncTerminalCursor);
+});
+
 function writeLine(text = '') {
   const line = document.createElement('div');
   line.className = 'line';
@@ -88,6 +98,7 @@ async function remoteFinger(name) {
   }
   running = true;
   input.disabled = true;
+  syncTerminalCursor();
   stopTrace();
   $('trace-state').textContent = 'RUNNING C';
   $('trace-source').textContent = 'AWAITING RESULT';
@@ -121,6 +132,7 @@ async function remoteFinger(name) {
     running = false;
     input.disabled = false;
     input.focus();
+    syncTerminalCursor();
   }
 }
 async function finger(args) {
@@ -203,6 +215,7 @@ form.addEventListener('submit', event => {
   if (running) return;
   const command = input.value;
   input.value = '';
+  syncTerminalCursor();
   void submitCommand(command);
 });
 input.addEventListener('keydown', event => {
@@ -238,61 +251,83 @@ function describeByte(index) {
   if (index >= 16 && number !== before) text += ' · previously ' + byteHex(before);
   return text;
 }
-function renderTrace() {
-  const baseline = initialFrame();
-  nameBytes.replaceChildren();
-  nextBytes.replaceChildren();
-  const overwritten = bytes.slice(16).some((byte, offset) => byte !== baseline[16 + offset]);
-  const crossed = position > 16 && replayVerified;
-  tracePanel.classList.toggle('is-crossing', crossed);
-  $('flow-visual').classList.toggle('is-diverted', Boolean(lastResult && position === writes.length && lastResult.flow === 'DIVERTED'));
+function renderDumpRow(start, baseline, crossed) {
+  const row = document.createElement('div');
+  row.className = 'dump-row';
+  if (crossed && start >= 16) row.classList.add('is-overwritten');
 
-  for (let index = 0; index < 24; index++) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'byte'
+  const address = document.createElement('span');
+  address.className = 'dump-address';
+  address.textContent = '+0x' + start.toString(16).toUpperCase().padStart(2, '0');
+
+  const values = document.createElement('div');
+  values.className = 'dump-hex';
+  for (let index = start; index < start + 8; index++) {
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    const changed = index >= 16 && index < position && bytes[index] !== baseline[index];
+    cell.className = 'mem-byte'
       + (index < position ? ' written' : '')
-      + (crossed && index >= 16 && index < position && bytes[index] !== baseline[index] ? ' crossed' : '')
-      + (position > 0 && index === position - 1 ? ' cursor' : '')
+      + (crossed && changed ? ' crossed' : '')
+      + (index === position - 1 && position > 0 ? ' cursor' : '')
       + (index === selectedByte ? ' chosen' : '');
-    const character = document.createElement('span');
-    character.textContent = byteText(bytes[index]);
-    const offset = document.createElement('small');
-    offset.textContent = index.toString(16).padStart(2, '0').toUpperCase();
-    item.title = describeByte(index);
-    item.setAttribute('aria-label', item.title);
-    item.addEventListener('click', () => {
+    cell.textContent = byteHex(bytes[index]).slice(2);
+    cell.title = describeByte(index);
+    cell.setAttribute('aria-label', cell.title);
+    cell.addEventListener('click', () => {
       selectedByte = index;
       $('byte-info').textContent = describeByte(index);
       renderTrace();
     });
-    item.append(character, offset);
-    (index < 16 ? nameBytes : nextBytes).append(item);
+    values.append(cell);
   }
+  const ascii = document.createElement('span');
+  ascii.className = 'dump-ascii';
+  ascii.textContent = bytes.slice(start, start + 8)
+    .map(value => value >= 32 && value <= 126 ? String.fromCharCode(value) : '·')
+    .join('');
 
+  row.append(address, values, ascii);
+  return row;
+}
+
+function renderTrace() {
+  const baseline = initialFrame();
+  nameBytes.replaceChildren();
+  nextBytes.replaceChildren();
+  const crossed = replayVerified && position > 16;
   const finishing = lastResult && (lastResult.status === 'INPUT REJECTED' || position >= writes.length);
+  const changed = lastResult && finishing &&
+    bytes.slice(16).some((value, index) => value !== baseline[16 + index]);
+
+  tracePanel.classList.toggle('is-crossing', crossed);
+  $('flow-visual').classList.toggle('is-diverted',
+    Boolean(lastResult && finishing && lastResult.flow === 'DIVERTED'));
+  nameBytes.append(renderDumpRow(0, baseline, crossed), renderDumpRow(8, baseline, crossed));
+  nextBytes.append(renderDumpRow(16, baseline, crossed));
+
   $('flow-value').textContent = !lastResult ? '—'
     : lastResult.status === 'INPUT REJECTED' ? 'RETURN'
-    : !finishing && position > 16 ? 'CHANGING…'
+    : !finishing && crossed ? 'WRITING…'
     : finishing ? lastResult.next || '?' : 'RETURN';
-  $('trace-count').textContent = position + ' / ' + writes.length;
+  $('trace-count').textContent = position + ' / ' + writes.length + ' BYTES';
   traceSeek.value = String(position);
   $('trace-state').textContent = !lastResult ? 'READY'
-    : lastResult.status === 'INPUT REJECTED' ? 'LENGTH CHECK PASSED'
-    : !finishing && position > 16 ? 'BOUNDARY CROSSED'
-    : !finishing && position > 0 ? 'COPYING INPUT'
-    : finishing && overwritten ? 'NEXT STEP MODIFIED'
-    : finishing ? 'COPY COMPLETED' : 'REPLAY READY';
-  $('trace-caption').textContent = !lastResult ? 'Run a query to begin.'
-    : lastResult.status === 'INPUT REJECTED' ? 'No write performed. The original bytes remain.'
-    : !finishing && position > 16 ? 'The copy has reached the adjacent field.'
-    : !finishing ? 'Reconstructing writes from the C output…'
-    : lastResult.flow === 'DIVERTED' ? 'The model now selects a different next step.'
-    : 'Memory remains within the expected boundary.';
+    : lastResult.status === 'INPUT REJECTED' ? 'BLOCKED'
+    : !finishing && crossed ? 'OVERFLOW'
+    : !finishing && position > 0 ? 'WRITING'
+    : changed ? 'ALTERED' : finishing ? 'COMPLETE' : 'READY';
+  $('trace-caption').textContent = !lastResult ? 'Run a query to inspect memory.'
+    : lastResult.status === 'INPUT REJECTED' ? 'Rejected before writing any input bytes.'
+    : !finishing && crossed ? 'Bytes are now crossing the 16-byte limit.'
+    : !finishing ? 'Reconstructing the memory writes…'
+    : lastResult.flow === 'DIVERTED' ? 'The symbolic next step has changed.'
+    : 'The input stayed within its buffer.';
   $('trace-source').textContent = !lastResult ? 'BEFORE INPUT'
-    : lastResult.status === 'INPUT REJECTED' ? 'PATCHED / C OUTPUT'
-    : 'REPLAY / VERIFIED';
+    : lastResult.status === 'INPUT REJECTED' ? 'PATCHED / C RESULT'
+    : replayVerified ? 'VERIFIED C REPLAY' : 'C RESULT';
 }
+
 function setTracePosition(next) {
   position = Math.min(writes.length, Math.max(0, next));
   bytes = reconstructedFrame(position);
@@ -347,12 +382,6 @@ traceSeek.addEventListener('input', () => {
   stopTrace();
   tracePlay.textContent = 'Play';
   setTracePosition(Number(traceSeek.value));
-});
-traceFormat.addEventListener('click', () => {
-  format = format === 'ascii' ? 'hex' : 'ascii';
-  traceFormat.textContent = format === 'hex' ? 'ASCII' : 'HEX';
-  traceFormat.setAttribute('aria-pressed', String(format === 'hex'));
-  renderTrace();
 });
 
 function updateGuide() {
@@ -489,6 +518,7 @@ function switchMode(nextMode) {
   updateGuide();
   closeAnalysis();
   input.value = previous ? 'finger ' + previous + '@research-vax' : '';
+  syncTerminalCursor();
 }
 $('inspect-link').addEventListener('click', showAnalysis);
 $('back-terminal').addEventListener('click', closeAnalysis);
@@ -522,3 +552,4 @@ fetch('/api/health').then(response => response.json()).then(data => {
   if (!data.ready) writeLine('finger: local C models are not compiled (run npm run build:lab)');
 }).catch(() => writeLine('finger: local demonstration unavailable'));
 input.focus();
+syncTerminalCursor();
