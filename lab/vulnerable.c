@@ -2,13 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Educational model: two adjacent fields in one stack object. */
 typedef struct {
     char name[16];
-    char next_step[8];
+    unsigned char adjacent[8];
 } Frame;
 
-_Static_assert(offsetof(Frame, next_step) == 16, "Unexpected field offset");
+_Static_assert(offsetof(Frame, adjacent) == 16, "Unexpected field offset");
 _Static_assert(sizeof(Frame) == 24, "Unexpected frame size");
 
 int main(int argc, char **argv) {
@@ -23,20 +22,14 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    Frame frame = {{0}, "RETURN"};
+    Frame frame = {{0}, {'Z','Z','Z','Z','Z','Z','Z','Z'}};
     unsigned char *bytes = (unsigned char *)&frame;
     for (size_t i = 0; i <= length; ++i) {
         bytes[i] = (unsigned char)argv[1][i];
     }
 
-    const char *flow = strcmp(frame.next_step, "DIVERT") == 0
-        ? "DIVERTED" : strcmp(frame.next_step, "RETURN") == 0
-        ? "NORMAL" : "CORRUPTED";
-
     puts("STATUS: ACCEPTED");
-    printf("NAME: %.16s\n", frame.name);
-    printf("NEXT: %.8s\n", frame.next_step);
-    printf("FLOW: %s\n", flow);
+    printf("CORRUPTED: %s\n", memcmp(frame.adjacent, "ZZZZZZZZ", 8) ? "YES" : "NO");
     printf("MEMORY:");
     for (size_t i = 0; i < sizeof(frame); ++i) {
         printf(" %02X", bytes[i]);
