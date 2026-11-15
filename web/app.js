@@ -11,6 +11,17 @@ const nextButton = document.getElementById('step-next');
 const replayControls = document.getElementById('replay-controls');
 const replayButton = document.getElementById('replay-button');
 const replayStatus = document.getElementById('replay-status');
+const snapshotName = document.getElementById('snapshot-name');
+const snapshotRole = document.getElementById('snapshot-role');
+const snapshotState = document.getElementById('snapshot-state');
+const snapshotContext = document.getElementById('snapshot-context');
+const snapshotResult = document.getElementById('snapshot-result');
+const guideStep = document.getElementById('guide-step');
+const guideTitle = document.getElementById('guide-title');
+const guideDescription = document.getElementById('guide-description');
+const guideCommand = document.getElementById('guide-command');
+const guideInsert = document.getElementById('guide-insert');
+
 
 const users = {
   alice: { name: 'Alice Morgan', tty: 'tty01', home: '/usr/alice' },
@@ -70,6 +81,7 @@ async function remoteFinger(name) {
   }
   busy = true;
   input.disabled = true;
+  updateSnapshot(null, '', true);
   try {
     const response = await fetch('/api/run', {
       method: 'POST',
@@ -80,7 +92,8 @@ async function remoteFinger(name) {
     if (!response.ok) throw new Error(data.error || 'remote query failed');
     lastResult = data;
     lastName = name;
-    if (name.length >= 16) inspectLink.hidden = false;
+    updateSnapshot(data, name);
+    updateGuide();
     if (data.status === 'INPUT REJECTED') {
       write('finger: remote request rejected');
     } else if (data.role === 'ADMIN' && data.vault === 'UNLOCKED') {
@@ -91,6 +104,10 @@ async function remoteFinger(name) {
       longFinger(name.toLowerCase());
     }
   } catch (error) {
+    lastResult = null;
+    lastName = '';
+    updateSnapshot();
+    updateGuide();
     write('finger: ' + error.message);
   } finally {
     busy = false;
@@ -179,6 +196,88 @@ async function run(raw) {
 }
 function baseMemory() {
   return [...Array(16).fill(0), 71, 85, 69, 83, 84, 0, 0, 0];
+}
+
+function updateSnapshot(result = null, name = '', running = false) {
+  snapshotName.replaceChildren();
+  snapshotRole.replaceChildren();
+  const values = result ? result.memory.map(hex => Number.parseInt(hex, 16)) : null;
+  const original = baseMemory();
+
+  for (let index = 0; index < 24; index++) {
+    const cell = document.createElement('span');
+    const byte = values ? values[index] : null;
+    const changed = values && index >= 16 && byte !== original[index];
+    cell.className = 'snapshot-byte'
+      + (values ? '' : ' placeholder')
+      + (changed ? ' changed' : '');
+    cell.textContent = byte === null ? '·' : byte === 0 ? '·'
+      : byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '·';
+    cell.title = byte === null ? 'Not yet read from C' :
+      'Offset ' + index + ': 0x' + byte.toString(16).toUpperCase().padStart(2, '0');
+    cell.setAttribute('aria-label', byte === null
+      ? 'Byte ' + index + ', awaiting C program'
+      : 'Byte ' + index + ', hexadecimal ' + byte.toString(16).toUpperCase().padStart(2, '0'));
+    (index < 16 ? snapshotName : snapshotRole).append(cell);
+  }
+
+  if (!result) {
+    snapshotState.textContent = running ? 'RUNNING C' : 'AWAITING INPUT';
+    snapshotContext.textContent = running
+      ? 'Processing the remote request and reading its memory output.'
+      : 'Run a remote lookup to see the actual bytes returned by the C program.';
+    snapshotResult.textContent = running ? 'Waiting for result…' : 'No C execution yet.';
+    return;
+  }
+
+  const rejected = result.status === 'INPUT REJECTED';
+  const changed = values.slice(16).some((value, i) => value !== original[16 + i]);
+  snapshotState.textContent = rejected ? 'REJECTED' : changed ? 'ROLE CHANGED' : 'ACCEPTED';
+  snapshotContext.textContent = 'Last remote request: ' + name.length
+    + ' characters · ' + result.mode.toUpperCase() + ' C program';
+  snapshotResult.textContent = rejected
+    ? 'Input refused. Role remains GUEST.'
+    : changed
+      ? 'Adjacent data changed: GUEST → ' + (result.role || '(empty)')
+      : 'Name accepted. Role remains ' + result.role + '.';
+}
+
+function updateGuide() {
+  const longRequest = lastResult && lastName.length >= 16;
+  let step, title, description, command = '';
+
+  if (mode === 'patched' && longRequest) {
+    step = '04 / AFTER THE FIX';
+    title = 'The same request was rejected';
+    description = 'The adjacent memory is unchanged. Open the explanation to compare.';
+  } else if (mode === 'patched') {
+    step = '03 / RETEST';
+    title = 'Run the same long request';
+    description = 'The corrected C program checks the length before writing.';
+    command = 'finger AAAAAAAAAAAAAAAAADMIN@research-vax';
+  } else if (longRequest) {
+    step = '03 / INVESTIGATE';
+    title = 'The long input reached nearby memory';
+    description = 'Look at the role bytes below. Open the explanation to see why.';
+  } else if (lastResult) {
+    step = '02 / LONG REQUEST';
+    title = 'Now try a longer name';
+    description = 'Compare the memory after a request that does not fit in the name field.';
+    command = 'finger AAAAAAAAAAAAAAAAADMIN@research-vax';
+  } else {
+    step = '01 / NORMAL REQUEST';
+    title = 'Start with a user lookup';
+    description = 'Try the same kind of request a user might have sent in 1988.';
+    command = 'finger alice@research-vax';
+  }
+
+  guideStep.textContent = step;
+  guideTitle.textContent = title;
+  guideDescription.textContent = description;
+  guideCommand.textContent = command;
+  guideCommand.hidden = !command;
+  guideInsert.hidden = !command;
+  inspectLink.hidden = !longRequest;
 }
 
 function stopReplay() {
@@ -350,7 +449,9 @@ function changeVersion(nextMode) {
   const previousQuery = lastName;
   mode = nextMode;
   lastResult = null;
-  inspectLink.hidden = true;
+  lastName = '';
+  updateSnapshot();
+  updateGuide();
   closeAnalysis();
   input.value = previousQuery ? 'finger ' + previousQuery + '@research-vax' : '';
   input.focus();
@@ -366,6 +467,10 @@ nextButton.addEventListener('click', () => {
   renderLesson();
 });
 inspectLink.addEventListener('click', showAnalysis);
+guideInsert.addEventListener('click', () => {
+  input.value = guideCommand.textContent;
+  input.focus();
+});
 replayButton.addEventListener('click', replayWrites);
 form.addEventListener('submit', async event => {
   event.preventDefault();
@@ -408,6 +513,8 @@ document.addEventListener('keydown', event => {
   }
 });
 startup();
+updateSnapshot();
+updateGuide();
 fetch('/api/health').then(res => res.json()).then(data => {
   if (!data.ready) write('finger: C lab is not compiled');
 }).catch(() => write('finger: local demo server unavailable'));
