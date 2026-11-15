@@ -277,7 +277,9 @@ function renderLesson() {
       title: isLong ? 'The name does not fit' : 'The name fits',
       description: 'This request contains ' + lastName.length + ' characters. With the end-of-string byte, it needs ' + (lastName.length + 1) + ' spaces. Only 16 are available for the name.',
       explanation: isLong
-        ? 'The first 16 boxes show where the letters would go. There is still more input left, but no more room in the name field.'
+        ? rejected
+          ? 'These boxes show where the letters would go. The corrected program rejected the request before writing any of them.'
+          : 'The first 16 boxes fill up. There is still more input left, but no space left for the name.'
         : 'There is room for the whole name and the end-of-string byte.'
     },
     {
