@@ -21,8 +21,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #eee; outline-off
 }
 .screen {
   width: 100%;
-  max-width: 90ch;
-  height: calc(100dvh - 2 * clamp(20px, 3vw, 45px));
+  max-width: 80ch;
+  height: calc(100dvh - clamp(40px, 6vw, 90px));
   min-height: 340px;
   overflow-y: auto;
   scrollbar-width: none;
