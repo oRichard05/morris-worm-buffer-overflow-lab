@@ -1,10 +1,14 @@
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
 typedef struct {
     char name[16];
-    char role[8];
-} Session;
+    char next_step[8];
+} Frame;
+
+_Static_assert(offsetof(Frame, next_step) == 16, "Unexpected field offset");
+_Static_assert(sizeof(Frame) == 24, "Unexpected frame size");
 
 int main(int argc, char **argv) {
     if (argc != 2) {
@@ -12,21 +16,26 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    Session session = {{0}, "GUEST"};
-    size_t name_length = strlen(argv[1]);
-    if (name_length >= sizeof(session.name)) {
+    Frame frame = {{0}, "RETURN"};
+    size_t length = strlen(argv[1]);
+    if (length > 22) {
+        fputs("Demo input must be 22 characters or fewer.\n", stderr);
+        return 1;
+    }
+
+    if (length >= sizeof(frame.name)) {
         puts("STATUS: INPUT REJECTED");
     } else {
-        memcpy(session.name, argv[1], name_length + 1);
+        memcpy(frame.name, argv[1], length + 1);
         puts("STATUS: ACCEPTED");
     }
 
-    printf("NAME: %.16s\n", session.name);
-    printf("ROLE: %.8s\n", session.role);
-    printf("VAULT: %s\n", strcmp(session.role, "ADMIN") == 0 ? "UNLOCKED" : "LOCKED");
+    printf("NAME: %.16s\n", frame.name);
+    printf("NEXT: %.8s\n", frame.next_step);
+    puts("FLOW: NORMAL");
     printf("MEMORY:");
-    const unsigned char *bytes = (const unsigned char *)&session;
-    for (size_t i = 0; i < sizeof(session); i++) {
+    const unsigned char *bytes = (const unsigned char *)&frame;
+    for (size_t i = 0; i < sizeof(frame); ++i) {
         printf(" %02X", bytes[i]);
     }
     putchar('\n');
