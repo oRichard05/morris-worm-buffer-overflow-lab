@@ -72,7 +72,7 @@ function showMemory(result, name) {
   if (result.status === 'INPUT REJECTED') {
     memoryExplain.textContent = 'The patched program checked the length before copying. The original GUEST role bytes are unchanged.';
   } else if (result.mode === 'vulnerable' && name.length >= 16) {
-    memoryExplain.textContent = `The name buffer ends at offset 15. The input writes into the adjacent role field beginning at offset 16. The highlighted bytes come from the C program's memory dump. This is a controlled example of undefined behavior.`;
+    memoryExplain.textContent = `The name buffer ends at offset 15. The input writes into the adjacent role field beginning at offset 16. The highlighted bytes come from the C program's memory dump. This is a controlled byte-level model: the writes cross the 16-byte name boundary but stay inside the 24-byte session object.`;
   } else {
     memoryExplain.textContent = 'The name fits inside the 16-byte buffer, including its terminating zero byte. The neighboring role remains GUEST.';
   }
@@ -90,13 +90,12 @@ function renderResult(result, name) {
   showMemory(result, name);
   if (result.status === 'INPUT REJECTED') {
     setMessage('safe', 'Input rejected by length check', 'The patched program prevented the overflow and kept the vault locked.');
-    terminalLine('STATUS: INPUT REJECTED', 'success');
   } else if (unlocked) {
     setMessage('danger', 'Security boundary crossed', 'Untrusted name data changed the role field to ADMIN.');
     terminalLine('ALERT: VAULT UNLOCKED WITHOUT AUTHORIZATION', 'error');
   } else if (name.length >= 16 && mode === 'vulnerable') {
     setMessage('danger', 'Adjacent memory was modified', 'The input crossed the name buffer boundary. The role was corrupted but access was not granted.');
-    terminalLine('WARNING: OUT-OF-BOUNDS WRITE DETECTED IN DEMO', 'error');
+    terminalLine('WARNING: NAME BUFFER BOUNDARY CROSSED', 'error');
   } else {
     setMessage('safe', 'Normal behavior', 'The input fits within the buffer and access remains restricted.');
   }
