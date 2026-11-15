@@ -9,7 +9,7 @@
   <script src="/app.js" defer></script>
 </head>
 <body>
-  <main id="terminal-view" class="terminal-view">
+  <main class="terminal-view">
     <div class="terminal-layout">
       <section id="glass" class="screen" aria-label="Reconstructed 4.3BSD UNIX terminal">
         <div id="terminal-output" class="screen-lines" role="log" aria-live="polite" aria-relevant="additions"></div>
@@ -22,49 +22,64 @@
         </form>
       </section>
 
-      <aside class="trace-panel" aria-label="Live-updating educational memory">
-        <header class="memory-top">
-          <span class="memory-heading">MEMORY</span>
+      <aside class="memory-lab" aria-label="Interactive memory visualization">
+        <header class="memory-header">
+          <h1>MEMORY</h1>
           <div class="mode-switch" role="group" aria-label="C program version">
-            <button type="button" id="mode-vulnerable" class="active" aria-pressed="true">VULNERABLE</button>
-            <button type="button" id="mode-patched" aria-pressed="false">PATCHED</button>
+            <button id="mode-vulnerable" class="active" type="button" aria-pressed="true">VULNERABLE</button>
+            <button id="mode-patched" type="button" aria-pressed="false">PATCHED</button>
           </div>
         </header>
 
-        <div class="memory-scene">
-          <div class="memory-region-label">
-            <span>NAME</span>
-            <span>16 BYTES</span>
-          </div>
-          <div id="name-bytes" class="memory-cells" aria-label="16 bytes reserved for the name"></div>
-
-          <div id="boundary-line" class="boundary-line">
-            <span class="boundary-stroke"></span>
-            <strong id="boundary-caption">BUFFER LIMIT</strong>
-            <span class="boundary-stroke"></span>
+        <div class="memory-workspace">
+          <div class="ribbon-labels" aria-hidden="true">
+            <span>BUFFER <small>16 BYTES</small></span>
+            <span>ADJACENT <small>8 BYTES</small></span>
           </div>
 
-          <div class="memory-region-label">
-            <span>NEXT STEP</span>
-            <span>8 BYTES</span>
+          <div class="ribbon-container">
+            <div id="memory-ribbon" class="memory-ribbon" role="group" aria-label="24 contiguous memory positions; click to inspect"></div>
+            <span class="ribbon-limit" aria-hidden="true"></span>
+            <span id="write-pointer" class="write-pointer" aria-hidden="true"></span>
           </div>
-          <div id="next-bytes" class="memory-cells" aria-label="8 bytes immediately after the name buffer"></div>
+
+          <div class="address-ruler" aria-hidden="true">
+            <span>0x00</span><span>0x10</span><span>0x17</span>
+          </div>
+
+          <div class="zoom-heading">
+            <span id="zoom-range">0x10 — 0x17</span>
+            <span>8-BYTE VIEW</span>
+          </div>
+
+          <div class="zoom-surface">
+            <div id="zoom-bytes" class="zoom-bytes" role="group" aria-label="Eight enlarged memory bytes"></div>
+          </div>
+
+          <div class="byte-inspection">
+            <span id="selected-address">0x10</span>
+            <strong id="selected-value">0x5A</strong>
+            <span id="selected-character">Z</span>
+          </div>
+
+          <div class="memory-outcome" aria-live="polite">
+            <span id="memory-status">MEMORY READY</span>
+            <span id="memory-delta">0 BYTES CHANGED</span>
+          </div>
         </div>
 
-        <div class="memory-bottom">
-          <div class="memory-reading">
-            <span id="trace-state" class="memory-status" aria-live="polite">READY</span>
-            <span id="trace-count" class="memory-progress">0 / 0</span>
+        <footer class="memory-controls">
+          <div class="playback-header">
+            <span id="trace-count">0 / 0</span>
+            <span id="run-mode">VULNERABLE</span>
           </div>
-          <div class="trace-playback">
-            <button id="trace-play" type="button" disabled>REPLAY <span aria-hidden="true">↻</span></button>
-            <input id="trace-seek" type="range" min="0" max="1" step="1" value="0" disabled aria-label="Playback position in the reconstructed memory write">
+          <div class="playback-row">
+            <button id="trace-play" type="button" disabled>REPLAY ↻</button>
+            <input id="trace-seek" type="range" min="0" max="1" step="1" value="0" disabled aria-label="Move through reconstructed memory writes">
           </div>
-          <p id="byte-info" class="byte-info" hidden></p>
-        </div>
+        </footer>
       </aside>
     </div>
   </main>
-
 </body>
 </html>
