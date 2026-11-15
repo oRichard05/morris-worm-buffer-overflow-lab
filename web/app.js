@@ -201,83 +201,98 @@ function baseMemory() {
 function updateSnapshot(result = null, name = '', running = false) {
   snapshotName.replaceChildren();
   snapshotRole.replaceChildren();
-  const values = result ? result.memory.map(hex => Number.parseInt(hex, 16)) : null;
+
+  const bytes = result ? result.memory.map(hex => Number.parseInt(hex, 16)) : null;
   const original = baseMemory();
 
   for (let index = 0; index < 24; index++) {
     const cell = document.createElement('span');
-    const byte = values ? values[index] : null;
-    const changed = values && index >= 16 && byte !== original[index];
+    const value = bytes ? bytes[index] : null;
+    const changed = bytes && index >= 16 && value !== original[index];
     cell.className = 'snapshot-byte'
-      + (values ? '' : ' placeholder')
+      + (bytes ? '' : ' placeholder')
       + (changed ? ' changed' : '');
-    cell.textContent = byte === null ? '·' : byte === 0 ? '·'
-      : byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '·';
-    cell.title = byte === null ? 'Not yet read from C' :
-      'Offset ' + index + ': 0x' + byte.toString(16).toUpperCase().padStart(2, '0');
-    cell.setAttribute('aria-label', byte === null
-      ? 'Byte ' + index + ', awaiting C program'
-      : 'Byte ' + index + ', hexadecimal ' + byte.toString(16).toUpperCase().padStart(2, '0'));
+
+    const character = document.createElement('span');
+    character.className = 'byte-character';
+    character.textContent = value === null || value === 0
+      ? '·'
+      : value >= 32 && value <= 126 ? String.fromCharCode(value) : '·';
+
+    const offset = document.createElement('span');
+    offset.className = 'byte-index';
+    offset.textContent = index.toString().padStart(2, '0');
+
+    cell.title = value === null ? 'Byte ' + index + ': waiting for C'
+      : 'Byte ' + index + ': 0x' + value.toString(16).toUpperCase().padStart(2, '0');
+    cell.setAttribute('aria-label', cell.title);
+    cell.append(character, offset);
     (index < 16 ? snapshotName : snapshotRole).append(cell);
   }
 
   if (!result) {
-    snapshotState.textContent = running ? 'RUNNING C' : 'AWAITING INPUT';
-    snapshotContext.textContent = running
-      ? 'Processing the remote request and reading its memory output.'
-      : 'Run a remote lookup to see the actual bytes returned by the C program.';
-    snapshotResult.textContent = running ? 'Waiting for result…' : 'No C execution yet.';
+    snapshotState.textContent = running ? 'RUNNING C' : 'NO QUERY YET';
+    snapshotResult.textContent = running ? 'Reading the C program’s output…' : 'Run the first request to see the memory.';
+    snapshotContext.textContent = running ? 'Waiting for the 24-byte snapshot.' : 'Nothing has been executed in C yet.';
     return;
   }
 
   const rejected = result.status === 'INPUT REJECTED';
-  const changed = values.slice(16).some((value, i) => value !== original[16 + i]);
-  snapshotState.textContent = rejected ? 'REJECTED' : changed ? 'ROLE CHANGED' : 'ACCEPTED';
-  snapshotContext.textContent = 'Last remote request: ' + name.length
-    + ' characters · ' + result.mode.toUpperCase() + ' C program';
+  const changed = bytes.slice(16).some((value, index) => value !== original[16 + index]);
+  snapshotState.textContent = rejected ? 'INPUT REJECTED' : changed ? 'BOUNDARY CROSSED' : 'NORMAL';
   snapshotResult.textContent = rejected
-    ? 'Input refused. Role remains GUEST.'
+    ? 'Request rejected. The role is still GUEST.'
     : changed
-      ? 'Adjacent data changed: GUEST → ' + (result.role || '(empty)')
-      : 'Name accepted. Role remains ' + result.role + '.';
+      ? 'The neighboring role changed: GUEST → ' + (result.role || '(empty)')
+      : 'The name fits. The neighboring role remains ' + result.role + '.';
+  snapshotContext.textContent = name.length + ' characters · ' + result.mode.toUpperCase() + ' C program';
 }
 
 function updateGuide() {
-  const longRequest = lastResult && lastName.length >= 16;
-  let step, title, description, command = '';
+  const longRequest = Boolean(lastResult && lastName.length >= 16);
+  let step = 1, label, title, description, command = '';
 
   if (mode === 'patched' && longRequest) {
-    step = '04 / AFTER THE FIX';
-    title = 'The same request was rejected';
-    description = 'The adjacent memory is unchanged. Open the explanation to compare.';
+    step = 4;
+    label = '04 / FIX VERIFIED';
+    title = 'The long request was blocked';
+    description = 'Same input, but the role stays GUEST.';
   } else if (mode === 'patched') {
-    step = '03 / RETEST';
-    title = 'Run the same long request';
-    description = 'The corrected C program checks the length before writing.';
+    step = 4;
+    label = '04 / TEST THE FIX';
+    title = 'Repeat the exact same request';
+    description = 'This version checks the length before copying.';
     command = 'finger AAAAAAAAAAAAAAAAADMIN@research-vax';
   } else if (longRequest) {
-    step = '03 / INVESTIGATE';
-    title = 'The long input reached nearby memory';
-    description = 'Look at the role bytes below. Open the explanation to see why.';
+    step = 3;
+    label = '03 / INVESTIGATE';
+    title = lastResult.role === 'ADMIN' ? 'GUEST became ADMIN' : 'The input crossed the boundary';
+    description = 'Look at the role bytes below. The name has reached another field.';
   } else if (lastResult) {
-    step = '02 / LONG REQUEST';
-    title = 'Now try a longer name';
-    description = 'Compare the memory after a request that does not fit in the name field.';
+    step = 2;
+    label = '02 / TEST THE LIMIT';
+    title = 'Now send a name that does not fit';
+    description = 'Compare the next snapshot with this normal result.';
     command = 'finger AAAAAAAAAAAAAAAAADMIN@research-vax';
   } else {
-    step = '01 / NORMAL REQUEST';
-    title = 'Start with a user lookup';
-    description = 'Try the same kind of request a user might have sent in 1988.';
+    label = '01 / FIRST REQUEST';
+    title = 'Start with a normal lookup';
+    description = 'A short name should leave neighboring memory unchanged.';
     command = 'finger alice@research-vax';
   }
 
-  guideStep.textContent = step;
+  guideStep.textContent = label;
   guideTitle.textContent = title;
   guideDescription.textContent = description;
   guideCommand.textContent = command;
   guideCommand.hidden = !command;
   guideInsert.hidden = !command;
   inspectLink.hidden = !longRequest;
+  for (const item of document.querySelectorAll('[data-stage]')) {
+    const index = Number(item.dataset.stage);
+    item.classList.toggle('active', index === step);
+    item.classList.toggle('complete', index < step);
+  }
 }
 
 function stopReplay() {
@@ -467,23 +482,36 @@ nextButton.addEventListener('click', () => {
   renderLesson();
 });
 inspectLink.addEventListener('click', showAnalysis);
-guideInsert.addEventListener('click', () => {
-  input.value = guideCommand.textContent;
-  input.focus();
-});
 replayButton.addEventListener('click', replayWrites);
-form.addEventListener('submit', async event => {
-  event.preventDefault();
-  if (busy) return;
-  const value = input.value;
-  input.value = '';
+
+async function submitCommand(value) {
+  if (busy || !value.trim()) return;
   write('research-vax% ' + value);
-  if (value.trim()) {
-    commands.push(value);
-    if (commands.length > 40) commands.shift();
-    historyIndex = commands.length;
-  }
+  commands.push(value);
+  if (commands.length > 40) commands.shift();
+  historyIndex = commands.length;
   await run(value);
+}
+
+guideInsert.addEventListener('click', async () => {
+  const command = guideCommand.textContent;
+  if (busy || !command) return;
+  guideInsert.disabled = true;
+  try {
+    input.value = '';
+    await submitCommand(command);
+  } finally {
+    guideInsert.disabled = false;
+    input.focus();
+  }
+});
+
+form.addEventListener('submit', event => {
+  event.preventDefault();
+  const command = input.value;
+  if (busy) return;
+  input.value = '';
+  void submitCommand(command);
 });
 input.addEventListener('keydown', event => {
   if (event.key === 'ArrowUp' && commands.length) {
