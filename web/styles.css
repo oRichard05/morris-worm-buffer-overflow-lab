@@ -238,6 +238,35 @@ button:focus-visible, input:focus-visible { outline: 2px solid #f4f4f0; outline-
   pointer-events: none;
 }
 .memory-lab.is-overflow .ribbon-limit { background: var(--overflow); box-shadow: 0 0 26px rgba(255,143,107,.75); }
+
+.ribbon-limit::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  bottom: -8px;
+  width: 18px;
+  border: 2px solid var(--overflow);
+  border-radius: 5px;
+  opacity: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.memory-lab.boundary-impact .ribbon-limit::after {
+  animation: boundary-impact .75s ease-out 1 both;
+}
+@keyframes boundary-impact {
+  0% { opacity: 1; width: 9px; box-shadow: 0 0 8px rgba(255,143,107,.9); }
+  38% { opacity: 1; width: 34px; box-shadow: 0 0 25px rgba(255,143,107,.8); }
+  100% { opacity: 0; width: 42px; box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .memory-lab.boundary-impact .ribbon-limit::after {
+    animation: none;
+    opacity: 1;
+    width: 18px;
+  }
+}
 .write-pointer {
   position: absolute;
   left: 2.08%;
