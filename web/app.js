@@ -84,23 +84,32 @@ function renderResult(result, name) {
   vaultValue.textContent = result.vault;
   roleValue.className = unlocked ? 'bad' : 'good';
   vaultValue.className = unlocked ? 'bad' : 'good';
-  roleDetail.textContent = unlocked ? 'Privilege escalation in demo' : 'Restricted permissions';
-  vaultDetail.textContent = unlocked ? 'Unexpected access granted' : 'Access restricted';
+  roleDetail.textContent = unlocked ? 'Role overwritten by input' : 'Educational access flag';
+  vaultDetail.textContent = unlocked ? 'Demonstration resource opened' : 'Resource remains restricted';
   document.getElementById('input-length').textContent = `${name.length} bytes`;
   showMemory(result, name);
+  prepareTrace(result, name);
+
   if (result.status === 'INPUT REJECTED') {
-    setMessage('safe', 'Input rejected by length check', 'The patched program prevented the overflow and kept the vault locked.');
+    setMessage('safe', 'Input rejected by length check', 'The fixed C program prevented the 16-byte name field from being overwritten.');
+    terminalLine('finger: request rejected (input exceeds safe buffer size)', 'success');
+    terminalLine('[LAB MODEL] ROLE: GUEST   RESOURCE: LOCKED', 'dim');
   } else if (unlocked) {
-    setMessage('danger', 'Security boundary crossed', 'Untrusted name data changed the role field to ADMIN.');
-    terminalLine('ALERT: VAULT UNLOCKED WITHOUT AUTHORIZATION', 'error');
+    setMessage('danger', 'Memory boundary crossed', 'Our educational model changed the adjacent role field to ADMIN.');
+    terminalLine('*** LOCAL MEMORY DEMONSTRATION: ROLE FIELD CORRUPTED ***', 'error');
+    terminalLine('[LAB MODEL] ROLE: GUEST -> ADMIN', 'error');
+    terminalLine('[LAB MODEL] RESOURCE: LOCKED -> UNLOCKED', 'error');
+    terminalLine('1988 fingerd exploit: control-flow hijack, not a role flag.', 'dim');
   } else if (name.length >= 16 && mode === 'vulnerable') {
-    setMessage('danger', 'Adjacent memory was modified', 'The input crossed the name buffer boundary. The role was corrupted but access was not granted.');
-    terminalLine('WARNING: NAME BUFFER BOUNDARY CROSSED', 'error');
+    setMessage('danger', 'Adjacent data changed', 'The input crossed the logical name buffer boundary.');
+    terminalLine('[LAB MODEL] Adjacent memory modified; resource remains locked.', 'error');
   } else {
-    setMessage('safe', 'Normal behavior', 'The input fits within the buffer and access remains restricted.');
-  }
-  for (const line of result.stdout.split('\n').filter(line => !line.startsWith('MEMORY:'))) {
-    terminalLine(line, line.includes('UNLOCKED') ? 'error' : '');
+    setMessage('safe', 'Normal user information request', 'The program completed normally and the role remains GUEST.');
+    terminalLine(`Login name: ${name.padEnd(18)} In real life: [sample record]`);
+    terminalLine('Directory: /usr/guest            Shell: /bin/csh');
+    terminalLine('On since Nov  2 09:12:00 on tty01');
+    terminalLine('No Plan.');
+    terminalLine('[LAB MODEL] ROLE: GUEST   RESOURCE: LOCKED', 'dim');
   }
 }
 
@@ -186,4 +195,102 @@ fetch('/api/health').then(response => response.json()).then(result => {
   backendStatus.classList.add('offline');
   backendStatus.innerHTML = '<span class="status-light"></span> OFFLINE';
   setMessage('danger', 'Server not available', 'Start the local website using npm start.');
+});
+
+
+const initialBytes = Array(16).fill(0).concat([71, 85, 69, 83, 84, 0, 0, 0]);
+let traceWrites = [];
+let tracePosition = 0;
+let traceSnapshot = null;
+let traceTimer = null;
+
+function stopTrace() {
+  if (traceTimer !== null) clearInterval(traceTimer);
+  traceTimer = null;
+  document.getElementById('trace-play').textContent = 'PLAY';
+  document.getElementById('trace-play').classList.remove('playing');
+}
+
+function prepareTrace(result, name) {
+  stopTrace();
+  traceSnapshot = result;
+  traceWrites = result.status === 'INPUT REJECTED' ? [] : [...name].map(char => char.charCodeAt(0)).concat(0);
+  drawTrace(traceWrites.length);
+}
+
+function drawTrace(position) {
+  if (!traceSnapshot) return;
+  tracePosition = Math.max(0, Math.min(position, traceWrites.length));
+  const frame = [...initialBytes];
+  for (let i = 0; i < tracePosition; i++) frame[i] = traceWrites[i];
+  const actual = traceSnapshot.memory.map(value => Number.parseInt(value, 16));
+  const complete = tracePosition === traceWrites.length;
+  const matches = !complete || frame.every((value, index) => value === actual[index]);
+  if (!matches) {
+    stopTrace();
+    memoryExplain.textContent = 'Trace and the C memory snapshot do not match. Do not use this trace as evidence.';
+    return;
+  }
+  [...memoryGrid.children].forEach((cell, index) => {
+    const byte = frame[index];
+    cell.querySelector('.hex').textContent = byte.toString(16).toUpperCase().padStart(2, '0');
+    cell.querySelector('.char').textContent = byte === 0 ? '␀' : byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '·';
+    const changed = index < tracePosition && frame[index] !== initialBytes[index];
+    cell.classList.toggle('trace-written', changed);
+    cell.classList.toggle('active-write', index === tracePosition - 1);
+    cell.classList.remove('overwritten');
+  });
+  document.getElementById('trace-counter').textContent = `${tracePosition} / ${traceWrites.length} bytes`;
+  document.getElementById('trace-next').disabled = tracePosition >= traceWrites.length;
+  document.getElementById('trace-reset').disabled = tracePosition === 0;
+  document.getElementById('trace-play').disabled = traceWrites.length === 0;
+  memoryLabel.textContent = `24 BYTES / ${traceSnapshot.mode.toUpperCase()}`;
+  if (traceSnapshot.status === 'INPUT REJECTED') {
+    memoryExplain.textContent = 'The patched C program rejected the long input before any copy. The GUEST field is unchanged.';
+  } else if (tracePosition === 0) {
+    memoryExplain.textContent = 'Initial state: name is empty and the role contains GUEST. Press NEXT BYTE or PLAY to reconstruct each write.';
+  } else {
+    const offset = tracePosition - 1;
+    memoryExplain.textContent = `Step ${tracePosition}: wrote offset ${offset} ${offset >= 16 ? 'in the adjacent ROLE field, outside the 16-byte name buffer.' : 'inside the NAME buffer.'} This is reconstructed from the C output, not a live debugger trace.`;
+  }
+  if (complete && traceTimer !== null) stopTrace();
+}
+
+document.getElementById('trace-next').addEventListener('click', () => {
+  stopTrace();
+  drawTrace(tracePosition + 1);
+});
+document.getElementById('trace-reset').addEventListener('click', () => {
+  stopTrace();
+  drawTrace(0);
+});
+document.getElementById('trace-play').addEventListener('click', () => {
+  if (!traceWrites.length) return;
+  if (traceTimer !== null) { stopTrace(); return; }
+  if (tracePosition >= traceWrites.length) drawTrace(0);
+  const button = document.getElementById('trace-play');
+  button.textContent = 'PAUSE';
+  button.classList.add('playing');
+  traceTimer = setInterval(() => drawTrace(tracePosition + 1), 190);
+});
+
+for (const button of document.querySelectorAll('[data-phosphor]')) {
+  button.addEventListener('click', () => {
+    document.body.dataset.phosphor = button.dataset.phosphor;
+    for (const item of document.querySelectorAll('[data-phosphor]')) {
+      item.setAttribute('aria-pressed', String(item === button));
+    }
+  });
+}
+document.getElementById('terminal-focus').addEventListener('click', () => {
+  document.body.classList.toggle('focus-terminal');
+  const active = document.body.classList.contains('focus-terminal');
+  document.getElementById('terminal-focus').textContent = active ? 'EXIT FOCUS (ESC)' : 'FOCUS TERMINAL';
+  input.focus();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && document.body.classList.contains('focus-terminal')) {
+    document.body.classList.remove('focus-terminal');
+    document.getElementById('terminal-focus').textContent = 'FOCUS TERMINAL';
+  }
 });
