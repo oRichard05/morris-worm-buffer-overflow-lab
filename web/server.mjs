@@ -35,8 +35,8 @@ function parseOutput(stdout, mode) {
     mode,
     status: lines.STATUS || 'ACCEPTED',
     name: lines.NAME || '',
-    role: lines.ROLE || '',
-    vault: lines.VAULT || '',
+    next: lines.NEXT || '',
+    flow: lines.FLOW || '',
     memory,
     stdout: stdout.trim()
   };
@@ -87,8 +87,8 @@ const server = http.createServer(async (req, res) => {
       }
       const input = JSON.parse(body);
       if (!input || !Object.hasOwn(binaries, input.mode) ||
-          typeof input.name !== 'string' || !/^[A-Za-z0-9_-]{1,21}$/.test(input.name)) {
-        respond(res, 400, { error: 'Use 1–21 ASCII letters, numbers, _ or -.' });
+          typeof input.name !== 'string' || !/^[A-Za-z0-9_-]{1,22}$/.test(input.name)) {
+        respond(res, 400, { error: 'Use 1–22 ASCII letters, numbers, _ or -.' });
         return;
       }
       if (!existsSync(binaries[input.mode])) {
