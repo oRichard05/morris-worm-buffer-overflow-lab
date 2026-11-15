@@ -4,11 +4,12 @@ const screen = $('glass');
 const form = $('command-form');
 const input = $('command-input');
 
-const nameBytes = $('name-bytes');
-const nextBytes = $('next-bytes');
-const tracePanel = document.querySelector('.trace-panel');
+const ribbon = $('memory-ribbon');
+const magnifier = $('zoom-bytes');
+const memoryLab = document.querySelector('.memory-lab');
 const traceSeek = $('trace-seek');
 const tracePlay = $('trace-play');
+const pointer = $('write-pointer');
 const blockCursor = $('terminal-block-cursor');
 
 const users = {
@@ -19,7 +20,9 @@ const users = {
 let mode = 'vulnerable';
 let lastResult = null;
 let running = false;
-let selectedByte = null;
+let selectedByte = 16;
+let zoomStart = 16;
+let followPlayback = true;
 let bytes = initialFrame();
 let writes = [];
 let position = 0;
@@ -29,7 +32,7 @@ const history = [];
 let historyIndex = 0;
 
 function initialFrame() {
-  return Array(16).fill(0).concat([82, 69, 84, 85, 82, 78, 0, 0]);
+  return Array(16).fill(0).concat(Array(8).fill(90));
 }
 function byteText(number) {
   if (number === 0) return '·';
@@ -109,8 +112,8 @@ async function remoteFinger(name) {
     useResult(data, name);
     if (data.status === 'INPUT REJECTED') {
       writeLine('finger: remote request rejected');
-    } else if (data.flow === 'DIVERTED' || data.flow === 'CORRUPTED') {
-      writeLine('finger: connection to research-vax closed unexpectedly');
+    } else if (data.corrupted) {
+      writeLine('finger: remote response corrupted');
     } else {
       longFinger(name.toLowerCase());
     }
@@ -222,79 +225,105 @@ screen.addEventListener('click', event => {
   if (event.target !== input) input.focus();
 });
 
+
 function stopTrace() {
   if (traceTimer !== null) clearInterval(traceTimer);
   traceTimer = null;
 }
-function reconstructedFrame(step) {
+function reconstructedFrame(count) {
   const frame = initialFrame();
-  for (let i = 0; i < step && i < writes.length; i++) frame[i] = writes[i];
+  for (let i = 0; i < count && i < writes.length; i++) frame[i] = writes[i];
   return frame;
 }
+function byteAt(index) {
+  return '0x' + index.toString(16).toUpperCase().padStart(2, '0');
+}
 function describeByte(index) {
-  const number = bytes[index];
-  const kind = index < 16 ? 'NAME' : 'NEXT STEP';
+  const byte = bytes[index];
   const before = initialFrame()[index];
-  let text = byteHex(index) + ' / ' + kind + ' = ' + byteHex(number);
-  if (number >= 32 && number <= 126) text += " ('" + String.fromCharCode(number) + "')";
-  if (index >= 16 && number !== before) text += ' · previously ' + byteHex(before);
-  return text;
+  const char = byte === 0 ? 'NUL' :
+    byte >= 32 && byte <= 126 ? "'" + String.fromCharCode(byte) + "'" : 'nonprintable';
+  return byteAt(index) + ' = ' + byteHex(byte) + ' ' + char
+    + (index >= 16 && byte !== before ? ' (was ' + byteHex(before) + ')' : '');
 }
-function renderMemoryCell(index, baseline, crossed) {
-  const cell = document.createElement('button');
-  const changed = crossed && index >= 16 &&
-    index < position && bytes[index] !== baseline[index];
-  const current = position > 0 && index === position - 1;
-
-  cell.type = 'button';
-  cell.className = 'memory-cell'
-    + (bytes[index] === 0 ? ' empty' : '')
-    + (index < position ? ' written' : '')
-    + (changed ? ' crossed' : '')
-    + (current ? ' current' : '')
-    + (index === selectedByte ? ' selected' : '');
-  cell.textContent = byteText(bytes[index]);
-  cell.title = describeByte(index);
-  cell.setAttribute('aria-label', cell.title);
-  cell.addEventListener('click', () => {
-    selectedByte = index;
-    $('byte-info').textContent = describeByte(index);
-    $('byte-info').hidden = false;
-    renderTrace();
-  });
-  return cell;
+function focusByte(index) {
+  followPlayback = false;
+  selectedByte = index;
+  zoomStart = Math.floor(index / 8) * 8;
+  renderMemory();
 }
-
-function renderTrace() {
+function selectWindow(index) {
+  selectedByte = index;
+  zoomStart = Math.floor(index / 8) * 8;
+}
+function renderMemory() {
   const baseline = initialFrame();
   const rejected = Boolean(lastResult && lastResult.status === 'INPUT REJECTED');
-  const crossed = replayVerified && position > 16;
+  const altered = bytes.slice(16).filter((byte, i) => byte !== baseline[16 + i]).length;
+  const crossed = altered > 0;
   const finished = Boolean(lastResult && (rejected || position >= writes.length));
-  const overwritten = finished && bytes.slice(16).some((byte, index) => byte !== baseline[16 + index]);
+  const activeIndex = lastResult && !rejected && position > 0 ? position - 1 : null;
 
-  tracePanel.classList.toggle('is-crossing', crossed);
-  tracePanel.classList.toggle('is-rejected', rejected);
-  nameBytes.replaceChildren();
-  nextBytes.replaceChildren();
-  for (let i = 0; i < 24; i++) {
-    (i < 16 ? nameBytes : nextBytes).append(renderMemoryCell(i, baseline, crossed));
+  memoryLab.classList.toggle('is-overflow', crossed);
+  ribbon.replaceChildren();
+  for (let index = 0; index < 24; index++) {
+    const segment = document.createElement('button');
+    segment.type = 'button';
+    segment.className = 'ribbon-byte'
+      + (index < position && !rejected ? ' written' : '')
+      + (index >= 16 && bytes[index] !== baseline[index] ? ' changed' : '')
+      + (activeIndex === index ? ' active' : '')
+      + (index >= zoomStart && index < zoomStart + 8 ? ' focused' : '');
+    segment.title = describeByte(index);
+    segment.setAttribute('aria-label', describeByte(index));
+    segment.addEventListener('click', () => focusByte(index));
+    ribbon.append(segment);
   }
 
-  $('boundary-caption').textContent = rejected ? 'BLOCKED'
-    : crossed ? 'OVERFLOW' : 'BUFFER LIMIT';
-  $('trace-state').textContent = !lastResult ? 'READY'
-    : rejected ? 'BLOCKED'
-    : !finished && crossed ? 'OVERFLOW'
-    : !finished && position > 0 ? 'WRITING'
-    : overwritten ? 'OVERWRITTEN' : finished ? 'COMPLETE' : 'READY';
+  const pointerVisible = Boolean(lastResult && !rejected && position > 0);
+  pointer.classList.toggle('is-hidden', !pointerVisible);
+  const pointerIndex = pointerVisible ? position - 1 : 0;
+  pointer.style.left = (100 * (pointerIndex + 0.5) / 24) + '%';
+
+  magnifier.replaceChildren();
+  for (let index = zoomStart; index < zoomStart + 8; index++) {
+    const value = bytes[index];
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'zoom-byte'
+      + (value === 0 ? ' empty' : '')
+      + (index >= 16 && value !== baseline[index] ? ' changed' : '')
+      + (activeIndex === index ? ' active' : '')
+      + (selectedByte === index ? ' selected' : '');
+    item.textContent = byteText(value);
+    item.title = describeByte(index);
+    item.setAttribute('aria-label', describeByte(index));
+    item.addEventListener('click', () => focusByte(index));
+    magnifier.append(item);
+  }
+  $('zoom-range').textContent = byteAt(zoomStart) + ' — ' + byteAt(zoomStart + 7);
+  $('selected-address').textContent = byteAt(selectedByte);
+  $('selected-value').textContent = byteHex(bytes[selectedByte]);
+  const value = bytes[selectedByte];
+  $('selected-character').textContent = value === 0 ? 'NUL'
+    : value >= 32 && value <= 126 ? String.fromCharCode(value) : '·';
+
+  $('memory-status').textContent = !lastResult ? 'MEMORY READY' :
+    rejected ? 'INPUT BLOCKED' : crossed ? 'MEMORY CORRUPTED' :
+    finished ? 'MEMORY INTACT' : 'WRITING…';
+  $('memory-delta').textContent = altered + (altered === 1 ? ' BYTE CHANGED' : ' BYTES CHANGED');
   $('trace-count').textContent = position + ' / ' + writes.length;
   traceSeek.value = String(position);
 }
-
-function setTracePosition(next) {
-  position = Math.min(writes.length, Math.max(0, next));
+function setTracePosition(step) {
+  position = Math.max(0, Math.min(writes.length, step));
   bytes = reconstructedFrame(position);
-  renderTrace();
+  if (followPlayback) {
+    const next = position > 16 ? 16 : position > 8 ? 8 : 0;
+    const active = position > 0 ? position - 1 : next;
+    selectWindow(active);
+  }
+  renderMemory();
 }
 function playTrace() {
   if (!replayVerified || !lastResult || !writes.length) return;
@@ -304,6 +333,7 @@ function playTrace() {
     return;
   }
   if (position >= writes.length) setTracePosition(0);
+  followPlayback = true;
   tracePlay.textContent = 'PAUSE Ⅱ';
   traceTimer = setInterval(() => {
     setTracePosition(position + 1);
@@ -311,20 +341,20 @@ function playTrace() {
       stopTrace();
       tracePlay.textContent = 'REPLAY ↻';
     }
-  }, 170);
+  }, 165);
 }
 function useResult(result, name) {
   stopTrace();
-  selectedByte = null;
-  $('byte-info').hidden = true;
-
+  lastResult = result;
   const target = result.memory.map(hex => Number.parseInt(hex, 16));
   const rejected = result.status === 'INPUT REJECTED';
-  writes = rejected ? [] : [...name].map(character => character.charCodeAt(0)).concat(0);
-  const calculated = reconstructedFrame(writes.length);
-  replayVerified = !rejected && calculated.every((byte, index) => byte === target[index]);
+  writes = rejected ? [] : [...name].map(c => c.charCodeAt(0)).concat(0);
+  const expected = reconstructedFrame(writes.length);
+  replayVerified = !rejected && expected.every((byte, index) => byte === target[index]);
   position = 0;
-
+  followPlayback = true;
+  selectedByte = rejected ? 16 : 0;
+  zoomStart = rejected ? 16 : 0;
   traceSeek.max = String(writes.length || 1);
   traceSeek.disabled = !replayVerified;
   tracePlay.disabled = !replayVerified;
@@ -333,18 +363,20 @@ function useResult(result, name) {
   if (rejected || !replayVerified) {
     bytes = target;
     if (!rejected) position = writes.length;
+    selectedByte = 16;
+    zoomStart = 16;
   } else {
     bytes = initialFrame();
   }
-  renderTrace();
+  renderMemory();
   if (replayVerified) playTrace();
 }
-
 tracePlay.addEventListener('click', playTrace);
 traceSeek.addEventListener('input', () => {
   if (!replayVerified) return;
   stopTrace();
   tracePlay.textContent = 'PLAY ▶';
+  followPlayback = true;
   setTracePosition(Number(traceSeek.value));
 });
 
@@ -353,7 +385,9 @@ function setMode(nextMode) {
   stopTrace();
   mode = nextMode;
   lastResult = null;
-  selectedByte = null;
+  selectedByte = 16;
+  zoomStart = 16;
+  followPlayback = true;
   writes = [];
   position = 0;
   replayVerified = false;
@@ -364,14 +398,14 @@ function setMode(nextMode) {
   traceSeek.disabled = true;
   tracePlay.disabled = true;
   tracePlay.textContent = 'REPLAY ↻';
-  $('byte-info').hidden = true;
   for (const version of ['vulnerable', 'patched']) {
     const button = $('mode-' + version);
     const active = version === mode;
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', String(active));
   }
-  renderTrace();
+  $('run-mode').textContent = mode.toUpperCase();
+  renderMemory();
   input.focus();
   syncTerminalCursor();
 }
@@ -379,7 +413,7 @@ $('mode-vulnerable').addEventListener('click', () => setMode('vulnerable'));
 $('mode-patched').addEventListener('click', () => setMode('patched'));
 
 boot();
-renderTrace();
+renderMemory();
 fetch('/api/health').then(response => response.json()).then(data => {
   if (!data.ready) writeLine('finger: local C models are not compiled (run npm run build:lab)');
 }).catch(() => writeLine('finger: local demonstration unavailable'));
