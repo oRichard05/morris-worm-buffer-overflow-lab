@@ -1,10 +1,10 @@
-# Morris Worm: 4.3BSD Finger Lab
+# Morris Worm · Buffer Overflow Lab
 
-An educational reconstruction of the UNIX `finger`/`fingerd` user-information interface from the era of the 1988 Morris Worm, for COMP 211 Checkoff 3.
+A local, classroom-safe reconstruction of the UNIX `finger`/`fingerd` experience that led to one of the most famous vulnerabilities exploited by the Morris Worm in 1988.
 
-## Run locally
+## Quick start
 
-Requirements: Node.js 18+, a C compiler (`cc`), and `make`.
+Requires Node.js 18+, a C compiler (`cc`) and `make`.
 
 ```sh
 git clone https://github.com/oRichard05/morris-worm-buffer-overflow-lab.git
@@ -14,61 +14,48 @@ npm test
 npm start
 ```
 
-Open http://127.0.0.1:4173. The local server does not accept public network connections and uses no third-party Node packages.
+Open **http://127.0.0.1:4173**. The server binds only to the local loopback address. The demonstration contains no worm, exploit payload, or publicly accessible vulnerable network daemon.
 
-## Terminal
+## Live classroom sequence
 
-The high-contrast, black-and-white screen represents a **4.3BSD UNIX shell session**. `fingerd` itself was a network daemon, not a separate menu program. On a real UNIX system, users interacted with it using the command `finger user@host`.
+The left side is a plain black-and-white **4.3BSD-inspired UNIX terminal**. Its right-side companion is a **modern educational stack visualizer**, not part of historical UNIX.
 
-The **4.3BSD-style terminal fills the left side of the screen** with no artificial frame or menus. On the right is a separate modern **Memory Inspector**, designed like a simple forensic memory map. Its 24-byte session snapshot comes from the local C program after each remote query: two rows of eight NAME bytes (offsets 00–0F), then a visible boundary at 0x10 and one row of eight ROLE bytes (offsets 10–17). If bytes cross the name boundary, the changed ROLE cells invert to white and a prominent comparison shows **GUEST → ADMIN**. Select any byte for its offset, value, and, when applicable, the value it replaced. The **HEX / ASCII** toggle switches between byte representations without rerunning the C program.
+1. Click **Run example** for `finger alice@research-vax`. The C model writes a short name inside its allotted 16-byte buffer. The symbolic next step stays `RETURN`.
+2. Click **Run example** for `finger AAAAAAAAAAAAAAAADIVERT@research-vax` (16 As + `DIVERT`). The simulator accepts 22 characters, then the **verified reconstructed byte replay** shows 23 writes, including the terminating zero byte. At offset 0x10 the copied data crosses into the adjacent field, turning the symbolic next step into `DIVERT`.
+3. The visualizer highlights the crossed boundary and compares **RETURN → DIVERT**. Use **Replay** to watch again or drag the timeline to inspect a particular byte. Click bytes to inspect their hexadecimal values; the **HEX / ASCII** toggle changes how they are displayed.
+4. Choose **Understand the failure** for a four-step explanation of the difference between this small model and the real Morris Worm incident. At the end choose **Try the corrected version**.
+5. Repeat the same long query (it is prefilled in the terminal or available as a guided example). The corrected C program rejects the input before copying and leaves `RETURN` intact. Use **Reset model** at the end of the explanation to begin again.
 
-A compact prompt underneath suggests the next query. Click **Run this command** or type in the UNIX terminal. After the long request, **Explain what happened** opens the four-step investigation. The inspector is an educational *post-execution snapshot*, not a continuous debugger trace or an original 1988 screen.
+Other supported shell-like commands include `finger`, `finger alice`, `who`, `whoami`, `date`, `hostname`, `uname`, `pwd`, `ls`, `cat /etc/motd`, `man finger`, `clear`, and `logout`. This is not a full UNIX shell.
 
-Try these commands:
+## What the C program actually demonstrates
 
-```text
-finger
-finger alice
-finger -s alice
-finger alice@research-vax
-finger AAAAAAAAAAAAAAAAADMIN@research-vax
-```
+The C programs use a 24-byte stack object with a 16-byte `name` field followed by an 8-byte `next_step` field. Its initial value is `RETURN`; the crafted input changes it to `DIVERT`. The vulnerable model writes bytes across the **logical field boundary**, but stays **inside the enclosing 24-byte object**, keeping the classroom experiment deterministic. The printed `FLOW: DIVERTED` is a **symbolic model outcome**, not actual instruction-pointer hijacking, shell execution, or arbitrary-code execution.
 
-The first three display period-style user information. The fourth represents a normal remote request to a finger daemon. The final command uses the controlled C demonstration: if the vulnerable model changes its adjacent role field, the **mock remote connection closes unexpectedly**. That output is an educational stand-in for corrupted state, *not* a claim to reproduce the real worm's execution.
+The browser visualizes each write **after the local C program finishes** by rebuilding the expected writes and comparing their final bytes with the C output. If they do not match, it does not claim to have a verified replay. The animation is not a live memory debugger trace.
 
-After the long remote query, click **Explain what happened** or press **F2** (on some Mac keyboards, **Fn + F2**). A separate four-step lesson explains the memory layout, why the name does not fit, how the neighboring bytes changed, and the connection to the original 1988 vulnerability. Each box represents one byte; hover for its hexadecimal value. At step three, the write replay runs automatically and can be restarted with **Replay the write**. It is reconstructed and checked against the final C memory output, not recorded from a live debugger.
+The patched version checks the name length before copying, including space for the null terminator. It rejects a request that cannot fit.
 
-At step four, choose **Try the fix**. The terminal returns with the same remote query already typed; press **Enter** to run it against the corrected C program. The long request should now be rejected. You can open the investigation again to see that the neighboring role stays unchanged. From the final step of that corrected walkthrough, **Reset experiment** restores the vulnerable model for another demonstration.
-
-Other supported shell-like commands include `who`, `whoami`, `date`, `hostname`, `uname`, `pwd`, `ls`, `cat /etc/motd`, `man finger`, `clear`, and `logout`. This is not a full UNIX shell.
-
-## Source accuracy and limitations
-
-This recreation was built against the 4.3BSD [finger command source](https://retro11.de/ouxr/43bsd/usr/src/ucb/finger.c.html) (revision dated March 13, 1986), [fingerd server source](https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html) (revision dated June 6, 1985), and the [1986 finger manual](https://retro11.de/ouxr/43bsd/usr/man/cat1/finger.0.html).
-
-The authentic command supported short and long user listings, and remote queries of the form `user@host`. The server accepted a line over the network and passed it to the command. Its historical stack buffer flaw was the unbounded read `gets(line)` into a 512-byte array, which the worm exploited to redirect execution on vulnerable VAX systems.
-
-This project **does not run the historical binaries or emulate a VAX**. It uses a small set of fictional users, a reconstructed command interface, and a simplified local C experiment. In the experiment, a 16-byte name field sits beside an 8-byte role field within one 24-byte stack object. The controlled demonstration writes across the name field boundary but stays within the enclosing object. Its `ADMIN` field exists *only inside the model* and **did not exist in the historical `fingerd` attack**. The simulated connection closure is not a recreation of code execution. The historical terminal portion intentionally contains no explanatory overlays; the separate investigation is modern teaching material.
-
-The newer corrected C example rejects a name that would exceed its buffer, including the required NUL terminator. The original historical vulnerability was addressed by fixing or disabling vulnerable services; the presentation should not treat this educational patch as an exact reproduction of a particular 1988 vendor patch.
-
-## C experiment
+You can run the binaries directly:
 
 ```sh
 ./lab/vulnerable alice
-./lab/vulnerable AAAAAAAAAAAAAAAAADMIN
-./lab/patched AAAAAAAAAAAAAAAAADMIN
+./lab/vulnerable AAAAAAAAAAAAAAAADIVERT
+./lab/patched AAAAAAAAAAAAAAAADIVERT
 npm test
 ```
 
-The `lab` directory contains the two C programs, their Makefile, and the test script. The `web` directory contains the local HTTP server, terminal interface, styles, and separate investigation view.
+## Historical accuracy
 
-## Historical references
+The `fingerd` service in 4.3BSD did not have a graphical interface. Users queried it through `finger user@host`. The real daemon used `gets()` to read into a 512-byte stack buffer without bounds checking. In November 1988, the Morris Worm exploited that vulnerability on susceptible VAX systems; the historical exploit could change the actual program counter, unlike this educational model. The worm also propagated through other mechanisms.
 
-- [4.3BSD finger.c, 1986](https://retro11.de/ouxr/43bsd/usr/src/ucb/finger.c.html)
-- [4.3BSD fingerd.c, 1985](https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html)
-- [4.3BSD finger(1) manual, 1986](https://retro11.de/ouxr/43bsd/usr/man/cat1/finger.0.html)
+This project **does not execute original 4.3BSD binaries, emulate a VAX, or recreate the worm**. The user records, host name, right-hand visualizer and symbolic next-step field are educational constructions. Changes to vulnerable input handling or disabling the exposed service were among the historical defenses; the safe model's patch is not a claim to duplicate a specific 1988 vendor patch.
+
+## References
+
+- [4.3BSD fingerd source (1985)](https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html)
+- [4.3BSD finger manual (1986)](https://retro11.de/ouxr/43bsd/usr/man/cat1/finger.0.html)
 - [RFC 1135: The Helminthiasis of the Internet](https://datatracker.ietf.org/doc/html/rfc1135)
 - [MITRE CWE-121: Stack-based Buffer Overflow](https://cwe.mitre.org/data/definitions/121.html)
 
-Presentation slides are prepared separately by the student, in accordance with the assignment.
+The separate course presentation requirements should be checked against the course assignment.
