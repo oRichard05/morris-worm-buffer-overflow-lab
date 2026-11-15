@@ -96,7 +96,7 @@ async function remoteFinger(name) {
   input.disabled = true;
   syncTerminalCursor();
   stopTrace();
-  $('trace-state').textContent = 'RUNNING C';
+  $('memory-status').textContent = 'RUNNING C';
   try {
     const response = await fetch('/api/run', {
       method: 'POST',
@@ -119,7 +119,7 @@ async function remoteFinger(name) {
     }
   } catch (error) {
     writeLine('finger: ' + error.message);
-    $('trace-state').textContent = 'SERVICE ERROR';
+    $('memory-status').textContent = 'SERVICE ERROR';
   } finally {
     running = false;
     input.disabled = false;
