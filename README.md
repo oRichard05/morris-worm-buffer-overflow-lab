@@ -1,54 +1,73 @@
 # Morris Worm: Stack Buffer Overflow Lab
 
-An interactive learning project for **COMP 211 Checkoff 3** about stack buffer overflows and memory safety in C.
+A local interactive demonstration of stack buffer overflows and memory safety in C, using the **1988 Morris Worm** as historical context. Created for COMP 211 Checkoff 3.
 
-## Concept
+## Run the interactive lab
 
-**Can You Hack a 1988 Computer?**
-
-This project explores how a memory error can change a program's behavior, using the 1988 Morris Worm as historical context. The presentation is designed as a guided demonstration: use the program, trigger the flaw, inspect memory, and test a fix.
-
-## Run the C lab
-
-Requirements: a C compiler (`cc`) and `make`.
+Requirements: **Node.js 18 or newer**, a C compiler (`cc`), and `make`.
 
 ```sh
-cd lab
-make
-./vulnerable alice
-./vulnerable AAAAAAAAAAAAAAAAADMIN
-./patched AAAAAAAAAAAAAAAAADMIN
+git clone https://github.com/oRichard05/morris-worm-buffer-overflow-lab.git
+cd morris-worm-buffer-overflow-lab
+npm run build:lab
+npm start
 ```
 
-The first command uses a normal name: the role stays `GUEST` and the vault remains locked. In the vulnerable program, a longer input can overwrite the adjacent `role` field, changing it to `ADMIN`. The patched program checks the input length and rejects that same input.
+Open **http://127.0.0.1:4173** in your browser. The website and C programs run entirely on your computer. No `npm install`, external libraries, or internet connection is needed after cloning.
 
-Each program also prints the underlying 24 bytes of the local `Session` structure in hexadecimal. The first 16 bytes represent the name buffer; the final 8 bytes represent the role.
+### Demo sequence
 
-**Important:** This is a deliberately simplified, local demonstration of a stack buffer overflow. It uses an unchecked `strcpy` to make adjacent-data corruption visible. The original `fingerd` vulnerability involved unsafe input handling and could lead to control-flow hijacking; it did **not** work by changing a `GUEST` field to `ADMIN`. The programs here are not copies of the original `fingerd` or Morris Worm.
+1. In **Vulnerable** mode, run the normal input (`alice`). The role stays `GUEST` and the vault stays locked.
+2. Use **Crafted Input** (`AAAAAAAAAAAAAAAAADMIN`) and run it. The unchecked copy extends beyond the 16-byte name buffer into the adjacent role field, causing the demo to display `ADMIN` and unlock its fictional vault.
+3. Open **Memory Inspector** to see the actual 24-byte snapshot printed by the C program: 16 bytes for the name and 8 bytes for the role.
+4. Open **The 1988 Incident** for historical context.
+5. Select **Patched** mode and rerun the same input. The length check rejects the input, preserving `GUEST` and a locked vault.
 
-To remove the compiled programs:
+The interface accepts up to 21 ASCII characters and the server binds only to `127.0.0.1`. It runs the two C programs as local subprocesses, without invoking a shell.
+
+## Run the C programs directly
 
 ```sh
-make clean
+npm run build:lab
+./lab/vulnerable alice
+./lab/vulnerable AAAAAAAAAAAAAAAAADMIN
+./lab/patched AAAAAAAAAAAAAAAAADMIN
+npm test
 ```
 
-## Presentation plan
+`npm test` checks the expected outputs of all three scenarios. To remove the compiled programs, use `make -C lab clean`.
 
-1. Introduce a fictional UNIX-style user information service.
-2. Demonstrate normal and unexpected program behavior.
-3. Examine the stack memory representation.
-4. Explain the historical `fingerd` vulnerability and the 1988 Morris Worm.
-5. Test a corrected implementation and discuss memory safety.
+## Project structure
 
-The interactive browser interface and student-authored presentation slides are planned additions.
+```text
+lab/
+  vulnerable.c    Unchecked copy into a local stack object
+  patched.c       Bounds check before copying
+  Makefile        Compiles both programs
+  check.sh        Checks the expected outcomes
+web/
+  server.mjs      Local HTTP server and C process runner
+  index.html      Interactive terminal, status panel, and case study
+  app.js          Experiment controls and memory visualization
+  styles.css      Interface styles
+package.json      Local commands
+```
+
+## Historical context and limitations
+
+The **Morris Worm** spread across parts of the early Internet in November 1988, using multiple weaknesses, including a stack buffer overflow in the UNIX `fingerd` service. The historical vulnerability could redirect execution; it did **not** grant access by overwriting a `GUEST` role field.
+
+This project deliberately uses a simplified fictional session object to make adjacent-data corruption easy to observe. The memory inspector displays actual bytes from the demonstration program, but this is **not** the original `fingerd` source, the original worm, or a complete recreation of the historical exploit. Out-of-bounds writes are undefined behavior in C; this demo has been checked in a controlled build, and results are not guaranteed across every compiler and platform.
+
+Only use the illustrated inputs in a controlled local environment. This repository does not include self-propagating code or a publicly accessible vulnerable service.
 
 ## References
 
-- [RFC 1135: The Helminthiasis of the Internet](https://datatracker.ietf.org/doc/html/rfc1135)
-- [MITRE CWE-121: Stack-based Buffer Overflow](https://cwe.mitre.org/data/definitions/121.html)
-- [FBI: Morris Worm](https://www.fbi.gov/history/cases-and-criminals/morris-worm)
-- [Eugene Spafford, *The Internet Worm Program: An Analysis*](https://docs.lib.purdue.edu/cstech/702/)
+- [RFC 1135 — The Helminthiasis of the Internet](https://datatracker.ietf.org/doc/html/rfc1135)
+- [Eugene Spafford — The Internet Worm Program: An Analysis](https://docs.lib.purdue.edu/cstech/702/)
+- [FBI — Morris Worm](https://www.fbi.gov/history/cases-and-criminals/morris-worm)
+- [MITRE CWE-121 — Stack-based Buffer Overflow](https://cwe.mitre.org/data/definitions/121.html)
 
-## Scope
+## Presentation
 
-The C examples are for controlled, local educational use. No self-propagating code or public vulnerable service is included. Any future visualization of the memory layout will be identified as illustrative unless derived directly from the demonstration's output.
+The interactive demonstration supports a 5–7 minute presentation. The accompanying slides are created separately by the student, as required by the assignment.
