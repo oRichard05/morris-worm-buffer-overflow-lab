@@ -3,59 +3,63 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#171b18">
+  <meta name="theme-color" content="#08090b">
   <title>research-vax — 4.3BSD UNIX</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
 </head>
 <body>
   <main id="terminal-view" class="terminal-view">
-    <div class="vt100" aria-label="1988-style UNIX terminal reconstruction">
-      <div class="bezel-top"><span>digital <small>VT100</small></span><span>VIDEO TERMINAL</span></div>
-      <div class="glass" id="glass">
+    <section class="screen-shell" aria-label="Recreated 4.3BSD terminal">
+      <div class="screen" id="glass">
         <div class="screen-lines" id="terminal-output" role="log" aria-live="polite" aria-relevant="additions"></div>
         <form id="command-form" class="command-form" autocomplete="off">
           <label for="command-input">research-vax% </label>
           <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="UNIX command" maxlength="160">
         </form>
       </div>
-      <div class="bezel-bottom"><span>DEC</span><span class="online-light" aria-label="Terminal online"></span></div>
-    </div>
+      <div class="screen-foot">
+        <span>4.3BSD UNIX · RECONSTRUCTION</span>
+        <button type="button" id="inspect-link" hidden>See what happened</button>
+      </div>
+    </section>
   </main>
 
   <main id="analysis-view" class="analysis-view" hidden>
     <div class="analysis">
-      <button id="return-terminal" class="text-button" type="button">← Return to terminal</button>
-      <p class="eyebrow">EDUCATIONAL MEMORY INVESTIGATION</p>
-      <h1>Why did the remote query fail?</h1>
-      <p>Our experiment models the same class of input-boundary mistake found in the 1988 <code>fingerd</code> vulnerability. It does not execute the original attack.</p>
+      <button id="return-terminal" class="text-button" type="button">← Back to terminal</button>
+      <p class="eyebrow">WHAT HAPPENED?</p>
+      <h1>One input. Two memory regions.</h1>
+      <p class="intro">The computer expected a user name. Our C example shows how a long input can change data that was supposed to stay untouched.</p>
 
-      <section>
-        <div class="section-heading">
-          <h2>Local C experiment</h2>
-          <span id="memory-label">NO REQUEST</span>
+      <section class="lesson">
+        <div class="lesson-header">
+          <span id="step-number">STEP 1 OF 4</span>
+          <span id="memory-label">24 BYTES</span>
         </div>
-        <p id="memory-explanation"></p>
-        <div class="memory-grid" id="memory-grid" aria-label="Bytes returned by C"></div>
-        <div class="memory-legend"><span>Name buffer (0–15)</span><span>Adjacent role field (16–23)</span></div>
+        <h2 id="step-title">Where does a name go?</h2>
+        <p id="step-description">The program reserves 16 bytes for the name. Right next to it is another field holding the user's role.</p>
+        <div id="memory-grid" class="memory-grid" aria-label="Memory bytes"></div>
+        <div class="memory-legend">
+          <span>NAME · 16 BYTES</span>
+          <span>ROLE · 8 BYTES</span>
+        </div>
+        <p id="memory-explanation" class="memory-explanation"></p>
+        <div class="step-actions">
+          <button id="step-previous" type="button" class="text-button" disabled>← Previous</button>
+          <button id="step-next" type="button" class="primary-button">Next →</button>
+        </div>
       </section>
 
-      <section>
-        <h2>What the real 4.3BSD code did</h2>
-        <pre>char line[512];
-gets(line);</pre>
-        <p>The original <code>fingerd</code> used an unbounded read into a 512-byte local buffer. The Morris Worm exploited that error on vulnerable VAX systems to redirect execution. Unlike that exploit, our smaller classroom model only demonstrates adjacent-field corruption.</p>
-        <p>A safer input read must respect the size of the destination buffer, including the final NUL byte. Updating or disabling vulnerable services was part of the historical response.</p>
-      </section>
-
-      <section>
-        <h2>Historical sources</h2>
-        <p><a href="https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html" target="_blank" rel="noopener noreferrer">4.3BSD fingerd source (1985)</a> · <a href="https://retro11.de/ouxr/43bsd/usr/man/cat1/finger.0.html" target="_blank" rel="noopener noreferrer">finger(1) manual (1986)</a> · <a href="https://datatracker.ietf.org/doc/html/rfc1135" target="_blank" rel="noopener noreferrer">RFC 1135</a></p>
+      <section class="case-note">
+        <h2>The connection to 1988</h2>
+        <p>The real <code>fingerd</code> service used a 512-byte buffer and a C function called <code>gets()</code>, which did not check the input length. The Morris Worm exploited that error to redirect execution. Our example uses a much smaller buffer and changes a neighboring role field so the problem is easier to see. It does <strong>not</strong> recreate the original attack.</p>
+        <p class="sources">Sources: <a href="https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html" target="_blank" rel="noopener noreferrer">Original 4.3BSD code</a> · <a href="https://datatracker.ietf.org/doc/html/rfc1135" target="_blank" rel="noopener noreferrer">RFC 1135</a></p>
       </section>
 
       <div class="actions">
-        <button id="apply-patch" type="button">Test with bounds checking</button>
-        <button id="reset-demo" class="text-button" type="button">Restore vulnerable model</button>
+        <button id="apply-patch" class="primary-button" type="button">Try the corrected version</button>
+        <button id="reset-demo" class="text-button" type="button">Use vulnerable version</button>
       </div>
     </div>
   </main>
