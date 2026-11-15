@@ -2,13 +2,14 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Educational model: two adjacent fields in one stack object. */
 typedef struct {
     char name[16];
-    char role[8];
-} Session;
+    char next_step[8];
+} Frame;
 
-_Static_assert(offsetof(Session, role) == 16, "Unexpected role offset");
-_Static_assert(sizeof(Session) == 24, "Unexpected session size");
+_Static_assert(offsetof(Frame, next_step) == 16, "Unexpected field offset");
+_Static_assert(sizeof(Frame) == 24, "Unexpected frame size");
 
 int main(int argc, char **argv) {
     if (argc != 2) {
@@ -17,22 +18,27 @@ int main(int argc, char **argv) {
     }
 
     size_t length = strlen(argv[1]);
-    if (length > 21) {
-        fputs("Demo input must be 21 characters or fewer.\n", stderr);
+    if (length > 22) {
+        fputs("Demo input must be 22 characters or fewer.\n", stderr);
         return 1;
     }
 
-    Session session = {{0}, "GUEST"};
-    unsigned char *bytes = (unsigned char *)&session;
-    for (size_t i = 0; i <= length; i++) {
+    Frame frame = {{0}, "RETURN"};
+    unsigned char *bytes = (unsigned char *)&frame;
+    for (size_t i = 0; i <= length; ++i) {
         bytes[i] = (unsigned char)argv[1][i];
     }
 
-    printf("NAME: %.16s\n", session.name);
-    printf("ROLE: %.8s\n", session.role);
-    printf("VAULT: %s\n", strcmp(session.role, "ADMIN") == 0 ? "UNLOCKED" : "LOCKED");
+    const char *flow = strcmp(frame.next_step, "DIVERT") == 0
+        ? "DIVERTED" : strcmp(frame.next_step, "RETURN") == 0
+        ? "NORMAL" : "CORRUPTED";
+
+    puts("STATUS: ACCEPTED");
+    printf("NAME: %.16s\n", frame.name);
+    printf("NEXT: %.8s\n", frame.next_step);
+    printf("FLOW: %s\n", flow);
     printf("MEMORY:");
-    for (size_t i = 0; i < sizeof(session); i++) {
+    for (size_t i = 0; i < sizeof(frame); ++i) {
         printf(" %02X", bytes[i]);
     }
     putchar('\n');
