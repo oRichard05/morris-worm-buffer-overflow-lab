@@ -139,6 +139,25 @@ button:focus-visible, input:focus-visible { outline: 2px solid #eee; outline-off
 .memory-legend { display: grid; grid-template-columns: 2fr 1fr; gap: 4px; margin-top: 5px; }
 .memory-legend span { text-align: center; padding: 8px 0; background: #29343e; }
 .memory-legend span+span { background: #3c414b; }
+.replay-controls {
+  margin-top: 17px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: space-between;
+  font: 12px/1.6 "Courier New",monospace;
+  color: #d4d9de;
+}
+#replay-button {
+  color: #e5e8ed;
+  background: transparent;
+  border: 1px solid #6e7781;
+  border-radius: 3px;
+  padding: 7px 11px;
+  font: inherit;
+}
+#replay-button:hover { background: #303741; }
 .memory-explanation { min-height: 2em; margin: 18px 0 0; font-size: 14px; }
 .step-actions { margin-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .primary-button {
