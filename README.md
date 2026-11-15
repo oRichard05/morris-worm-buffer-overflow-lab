@@ -14,6 +14,8 @@ npm test
 npm start
 ```
 
+Running `npm start` also rebuilds the C models automatically when their sources change.
+
 Open **http://127.0.0.1:4173**. The server binds only to the local loopback address. The demonstration contains no worm, exploit payload, or publicly accessible vulnerable network daemon.
 
 ## Live classroom sequence
