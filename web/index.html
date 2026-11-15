@@ -10,19 +10,14 @@
 </head>
 <body>
   <main id="terminal-view" class="terminal-view">
-    <section class="screen-shell" aria-label="Recreated 4.3BSD terminal">
-      <div class="screen" id="glass">
-        <div class="screen-lines" id="terminal-output" role="log" aria-live="polite" aria-relevant="additions"></div>
-        <form id="command-form" class="command-form" autocomplete="off">
-          <label for="command-input">research-vax% </label>
-          <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="UNIX command" maxlength="160">
-        </form>
-      </div>
-      <div class="screen-foot">
-        <span>4.3BSD UNIX · RECONSTRUCTION</span>
-        <button type="button" id="inspect-link" hidden>See what happened</button>
-      </div>
-    </section>
+    <div class="screen" id="glass" aria-label="4.3BSD UNIX terminal reconstruction">
+      <div class="screen-lines" id="terminal-output" role="log" aria-live="polite" aria-relevant="additions"></div>
+      <form id="command-form" class="command-form" autocomplete="off">
+        <label for="command-input">research-vax% </label>
+        <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="UNIX command" maxlength="160">
+      </form>
+      <button type="button" id="inspect-link" hidden>See what happened (F2)</button>
+    </div>
   </main>
 
   <main id="analysis-view" class="analysis-view" hidden>
