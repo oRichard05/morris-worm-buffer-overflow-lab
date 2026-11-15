@@ -10,13 +10,45 @@
 </head>
 <body>
   <main id="terminal-view" class="terminal-view">
-    <div class="screen" id="glass" aria-label="4.3BSD UNIX terminal reconstruction">
-      <div class="screen-lines" id="terminal-output" role="log" aria-live="polite" aria-relevant="additions"></div>
-      <form id="command-form" class="command-form" autocomplete="off">
-        <label for="command-input">research-vax% </label>
-        <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="UNIX command" maxlength="160">
-      </form>
-      <button type="button" id="inspect-link" hidden>See what happened (F2)</button>
+    <div class="terminal-layout">
+      <div class="screen" id="glass" aria-label="4.3BSD UNIX terminal reconstruction">
+        <div class="screen-lines" id="terminal-output" role="log" aria-live="polite" aria-relevant="additions"></div>
+        <form id="command-form" class="command-form" autocomplete="off">
+          <label for="command-input">research-vax% </label>
+          <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="UNIX command" maxlength="160">
+        </form>
+      </div>
+
+      <aside class="lab-sidebar" aria-label="Lab guidance and C memory snapshot">
+        <div class="guide-pane">
+          <p class="side-kicker">LAB GUIDE <span>MODERN VIEW</span></p>
+          <p id="guide-step" class="guide-step">01 / NORMAL REQUEST</p>
+          <h2 id="guide-title">Start with a user lookup</h2>
+          <p id="guide-description" class="guide-description">Try the same kind of request a user might have sent in 1988.</p>
+          <div id="guide-command" class="guide-command">finger alice@research-vax</div>
+          <button id="guide-insert" type="button" class="side-button">Insert command ↗</button>
+          <button type="button" id="inspect-link" class="side-button secondary" hidden>See what happened →</button>
+        </div>
+
+        <section class="snapshot-pane" aria-label="Last C memory snapshot">
+          <div class="snapshot-heading">
+            <p class="side-kicker">MEMORY INSPECTOR</p>
+            <span id="snapshot-state" class="snapshot-state" aria-live="polite">AWAITING INPUT</span>
+          </div>
+          <p id="snapshot-context" class="snapshot-context">Run a remote lookup to see the actual bytes returned by the C program.</p>
+
+          <div class="snapshot-group">
+            <div class="snapshot-label"><span>NAME BUFFER</span><span>16 BYTES</span></div>
+            <div id="snapshot-name" class="snapshot-bytes" aria-label="Name buffer bytes"></div>
+          </div>
+          <div class="snapshot-group">
+            <div class="snapshot-label"><span>ADJACENT ROLE</span><span>8 BYTES</span></div>
+            <div id="snapshot-role" class="snapshot-bytes" aria-label="Role field bytes"></div>
+          </div>
+          <p id="snapshot-result" class="snapshot-result" aria-live="polite">No C execution yet.</p>
+          <p class="snapshot-note">Snapshot after each C execution, not a live debugger trace. The historical fingerd did not have this display.</p>
+        </section>
+      </aside>
     </div>
   </main>
 
