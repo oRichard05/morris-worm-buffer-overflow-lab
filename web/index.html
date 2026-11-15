@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#08090b">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050606">
   <title>research-vax — 4.3BSD UNIX</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
@@ -11,99 +11,100 @@
 <body>
   <main id="terminal-view" class="terminal-view">
     <div class="terminal-layout">
-      <section class="screen" id="glass" aria-label="Recreated 4.3BSD UNIX terminal">
-        <div class="screen-lines" id="terminal-output" role="log" aria-live="polite" aria-relevant="additions"></div>
+      <section id="glass" class="screen" aria-label="Reconstructed 4.3BSD UNIX terminal">
+        <div id="terminal-output" class="screen-lines" role="log" aria-live="polite" aria-relevant="additions"></div>
         <form id="command-form" class="command-form" autocomplete="off">
           <label for="command-input">research-vax% </label>
           <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="UNIX command" maxlength="160">
         </form>
       </section>
 
-      <aside class="memory-monitor" aria-label="Educational memory monitor">
-        <div class="inspector-header">
-          <div class="inspector-identity">
-            <span class="inspector-index">01 / LOCAL ANALYSIS</span>
-            <h2>Memory inspector</h2>
+      <aside class="trace-panel" aria-label="Educational memory and execution visualizer">
+        <header class="trace-heading">
+          <div>
+            <span class="eyebrow-small">MORRIS LAB / LOCAL MODEL</span>
+            <h1>Inside the process</h1>
           </div>
-          <button type="button" id="memory-mode-toggle" class="mode-toggle" aria-label="Show hexadecimal byte values" aria-pressed="false">HEX <span aria-hidden="true">↔</span></button>
+          <button id="trace-format" class="format-toggle" type="button" aria-pressed="false">HEX</button>
+        </header>
+
+        <div class="trace-summary">
+          <span id="trace-state" class="trace-state" aria-live="polite">READY</span>
+          <span id="trace-source">BEFORE INPUT</span>
         </div>
 
-        <div class="memory-status">
-          <span id="snapshot-state" class="status-indicator" aria-live="polite">NO QUERY YET</span>
-          <span id="snapshot-context" class="snapshot-context">24-BYTE SESSION</span>
+        <div class="incoming">
+          <div class="trace-label"><span>INCOMING REQUEST</span><span id="input-length">0 BYTES</span></div>
+          <div id="input-preview" class="input-preview">Awaiting a finger request</div>
         </div>
 
-        <div class="memory-region name-region">
-          <div class="region-heading"><span><b>01</b> NAME</span><span>00–0F / 16 BYTES</span></div>
-          <div id="snapshot-name" class="snapshot-bytes" aria-label="Name buffer, bytes 0 to 15"></div>
+        <section class="frame-display" aria-label="Simulated 24-byte C stack object">
+          <div class="trace-label"><span>STACK OBJECT / 24 BYTES</span><span>OFFSETS IN HEX</span></div>
+          <div class="region-label"><span>NAME BUFFER</span><span>00–0F · 16 BYTES</span></div>
+          <div id="name-bytes" class="byte-grid" aria-label="Name bytes"></div>
+
+          <div id="boundary-line" class="boundary-line">
+            <span class="boundary-dash"></span>
+            <strong>0x10 / BUFFER LIMIT</strong>
+            <span class="boundary-dash"></span>
+          </div>
+
+          <div class="region-label"><span>NEXT STEP</span><span>10–17 · 8 BYTES</span></div>
+          <div id="next-bytes" class="byte-grid" aria-label="Adjacent symbolic next-step bytes"></div>
+        </section>
+
+        <div id="flow-visual" class="flow-visual">
+          <div><span>EXPECTED</span><strong>RETURN</strong></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div><span>MODEL RESULT</span><strong id="flow-value">—</strong></div>
         </div>
 
-        <div id="memory-boundary" class="memory-boundary" aria-live="polite">
-          <span class="boundary-marker"></span>
-          <span id="boundary-copy">BUFFER ENDS AT 0x10</span>
-          <span class="boundary-marker"></span>
+        <div class="trace-playback">
+          <div class="playback-top">
+            <span id="trace-caption" aria-live="polite">Waiting for the first request.</span>
+            <span id="trace-count">0 / 0</span>
+          </div>
+          <div class="playback-controls">
+            <button id="trace-play" type="button" disabled>Replay</button>
+            <input id="trace-seek" type="range" min="0" max="1" step="1" value="0" disabled aria-label="Scrub memory write replay">
+          </div>
+          <p id="byte-info" class="byte-info">Select a byte to inspect its value.</p>
         </div>
 
-        <div class="memory-region role-region">
-          <div class="region-heading"><span><b>02</b> ROLE</span><span>10–17 / 8 BYTES</span></div>
-          <div id="snapshot-role" class="snapshot-bytes" aria-label="Adjacent role field, bytes 16 to 23"></div>
-        </div>
+        <section class="next-action" aria-label="Suggested next step">
+          <span id="guide-step" class="eyebrow-small">01 / BASELINE</span>
+          <h2 id="guide-title">Start with a normal request</h2>
+          <p id="guide-description">See a name fit inside its memory boundary.</p>
+          <code id="guide-command">finger alice@research-vax</code>
+          <button id="guide-run" class="primary-action" type="button">Run example <span aria-hidden="true">↗</span></button>
+          <button id="inspect-link" class="primary-action" type="button" hidden>Understand the failure <span aria-hidden="true">↗</span></button>
+        </section>
 
-        <div class="role-transition" aria-label="Role before and after last request">
-          <div class="role-side"><span>EXPECTED</span><strong>GUEST</strong></div>
-          <div class="transition-arrow" aria-hidden="true">→</div>
-          <div class="role-side role-current"><span>AFTER REQUEST</span><strong id="role-value">—</strong></div>
-        </div>
-
-        <div class="byte-inspection">
-          <p id="snapshot-result" class="snapshot-result" aria-live="polite">Run a query to inspect its memory.</p>
-          <p id="byte-detail" class="byte-detail">Select a byte to inspect its address and value.</p>
-        </div>
-
-        <div class="guide-pane">
-          <div class="guide-meta"><span id="guide-step">01 / NORMAL LOOKUP</span><span>NEXT ACTION</span></div>
-          <h3 id="guide-title">Try a normal request</h3>
-          <p id="guide-description" class="guide-description">Compare what happens when an input fits.</p>
-          <code id="guide-command" class="guide-command">finger alice@research-vax</code>
-          <button id="guide-insert" type="button" class="guide-button">Run this command <span aria-hidden="true">↗</span></button>
-          <button type="button" id="inspect-link" class="guide-button secondary" hidden>Explain what happened <span aria-hidden="true">↗</span></button>
-        </div>
-        <p class="snapshot-note">Educational memory snapshot after C execution · not a historical UNIX display.</p>
+        <p class="trace-foot">Byte-by-byte replay reconstructed from local C output. Not a live debugger or the original 1988 binary.</p>
       </aside>
     </div>
   </main>
 
   <main id="analysis-view" class="analysis-view" hidden>
     <div class="analysis">
-      <button id="return-terminal" class="text-button" type="button">← Back to terminal</button>
-      <p class="eyebrow">WHAT HAPPENED?</p>
-      <h1>One input. Two memory regions.</h1>
-      <p class="intro">A user-name request was longer than the space reserved for it. Here's what happened inside our C example.</p>
-
+      <button id="back-terminal" class="back-button" type="button">← Return to terminal</button>
+      <span class="eyebrow-small">THE 1988 INCIDENT / EXPLAINED</span>
+      <h1>How a name changed the program's next step</h1>
+      <p class="analysis-intro">A short reconstruction of the memory error that helped the Morris Worm spread.</p>
       <section class="lesson">
-        <div class="lesson-header">
-          <span id="step-number">STEP 1 OF 4</span>
-          <span id="memory-label">24 BYTES</span>
-        </div>
-        <h2 id="step-title">Where does a name go?</h2>
-        <p id="step-description">The program reserves 16 bytes for the name. Right next to it is another field holding the user's role.</p>
-        <div id="memory-grid" class="memory-grid" aria-label="Memory bytes"></div>
-        <div class="memory-legend">
-          <span>NAME · 16 BYTES</span>
-          <span>ROLE · 8 BYTES</span>
-        </div>
-        <div id="replay-controls" class="replay-controls" hidden>
-          <span id="replay-status" aria-live="polite">Ready to replay</span>
-          <button id="replay-button" type="button">Replay the write</button>
-        </div>
-        <p id="memory-explanation" class="memory-explanation"></p>
-        <div class="step-actions">
-          <button id="step-previous" type="button" class="text-button" disabled>← Previous</button>
-          <button id="reset-demo" class="text-button" type="button" hidden>Reset experiment</button>
-          <button id="step-next" type="button" class="primary-button">Next →</button>
+        <div class="lesson-meta"><span id="lesson-count">01 / 04</span><span>MEMORY MODEL</span></div>
+        <h2 id="lesson-title"></h2>
+        <p id="lesson-text"></p>
+        <div id="lesson-memory" class="lesson-memory" aria-label="Memory visualization for the current explanation"></div>
+        <div class="lesson-key"><span>NAME / 16 BYTES</span><span>NEXT STEP / 8 BYTES</span></div>
+        <p id="lesson-note" class="lesson-note"></p>
+        <div class="lesson-actions">
+          <button id="lesson-previous" class="back-button" type="button">← Previous</button>
+          <button id="lesson-reset" class="back-button" type="button" hidden>Reset model</button>
+          <button id="lesson-next" class="primary-action" type="button">Next →</button>
         </div>
       </section>
-      <p class="sources">Historical sources: <a href="https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html" target="_blank" rel="noopener noreferrer">Original 4.3BSD fingerd</a> · <a href="https://datatracker.ietf.org/doc/html/rfc1135" target="_blank" rel="noopener noreferrer">RFC 1135</a></p>
+      <p class="sources">Historical references: <a href="https://retro11.de/ouxr/43bsd/usr/src/etc/fingerd.c.html" target="_blank" rel="noopener noreferrer">4.3BSD fingerd source</a> · <a href="https://datatracker.ietf.org/doc/html/rfc1135" target="_blank" rel="noopener noreferrer">RFC 1135</a></p>
     </div>
   </main>
 </body>
