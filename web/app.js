@@ -17,8 +17,6 @@ const modeButtons = {
 const normal = 'alice';
 const crafted = 'AAAAAAAAAAAAAAAAADMIN';
 let mode = 'vulnerable';
-let latest = null;
-let lastInput = '';
 let running = false;
 
 function terminalLine(message, kind = '') {
@@ -81,8 +79,6 @@ function showMemory(result, name) {
 }
 
 function renderResult(result, name) {
-  latest = result;
-  lastInput = name;
   const unlocked = result.vault === 'UNLOCKED';
   roleValue.textContent = result.role || '(EMPTY)';
   vaultValue.textContent = result.vault;
