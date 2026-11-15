@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b1112">
-  <title>Morris Lab — 1988 Memory Incident</title>
+  <meta name="theme-color" content="#171d1c">
+  <title>Morris Lab | A 1988 UNIX Terminal Reconstruction</title>
   <link rel="stylesheet" href="/styles.css">
   <script type="module" src="/app.js"></script>
 </head>
@@ -16,7 +16,7 @@
         <div class="brand-icon">M<span>_</span></div>
         <div>
           <strong>MORRIS LAB</strong>
-          <small>MEMORY SECURITY / 1988</small>
+          <small>4.3BSD / 02 NOV 1988</small>
         </div>
       </div>
       <div class="header-right">
@@ -27,42 +27,43 @@
 
     <main>
       <section class="hero">
-        <div class="eyebrow"><span class="line"></span> INTERACTIVE SECURITY CASE STUDY <span class="hero-serial">[ 02 NOV 1988 ]</span></div>
-        <h1>Can you <em>break</em><br>a 1988 computer?</h1>
-        <p>A single unchecked input. A memory boundary crossed. A small bug with potentially serious consequences.</p>
+        <div class="eyebrow"><span class="line"></span> HISTORICAL TERMINAL RECONSTRUCTION <span class="hero-serial">[ 02 NOV 1988 ]</span></div>
+        <h1>A computer from <em>1988.</em><br>One unexpected input.</h1>
+        <p>An interactive reconstruction of a UNIX terminal, and the memory vulnerability behind one of the earliest Internet security incidents.</p>
       </section>
 
       <div class="workspace">
         <section class="terminal-card" aria-labelledby="terminal-heading">
           <div class="window-top">
-            <div class="window-dots"><i></i><i></i><i></i></div>
-            <span id="terminal-heading">unix-server / fingerd-inspired demo</span>
-            <span class="window-badge">LOCAL EXECUTION</span>
+            <div class="terminal-brand" aria-label="VT100 style display">digital <span>VT100</span></div>
+            <span id="terminal-heading">4.3BSD / research-vax / tty00</span>
+            <span class="window-badge">80 COLUMNS · 24 LINES</span>
           </div>
           <div class="terminal-content">
             <div class="terminal-screen" id="terminal-screen" role="log" aria-live="polite">
-              <div class="term-line dim">UNIX System V — reconstructed terminal session</div>
-              <div class="term-line dim">Connected to educational local service.</div>
-              <div class="term-line dim">Type a name below and observe the result.</div>
+              <div class="term-line dim">4.3BSD UNIX (educational reconstruction)</div>
+              <div class="term-line dim">research-vax  /  Wed Nov  2 1988  /  tty00</div>
+              <div class="term-line dim">login: guest  ·  Last login: Wed Nov  2 08:42:17</div>
             </div>
           </div>
           <form id="run-form" class="input-dock">
-            <label for="name-input">QUERY USER INFORMATION</label>
+            <label for="name-input">REMOTE USER LOOKUP · FINGER(1)</label>
             <div class="input-row">
-              <span class="prompt">$ finger</span>
+              <span class="prompt">lab% finger</span>
               <input id="name-input" name="name" type="text" value="alice" maxlength="21" autocomplete="off" spellcheck="false" aria-label="User input" required>
               <button id="run-button" class="run-button" type="submit">RUN <span aria-hidden="true">↗</span></button>
             </div>
             <div class="presets">
-              <button type="button" class="preset" id="normal-preset">01 / NORMAL INPUT</button>
-              <button type="button" class="preset" id="overflow-preset">02 / CRAFTED INPUT</button>
+              <button type="button" class="preset" id="normal-preset">01 / NORMAL USER</button>
+              <button type="button" class="preset" id="overflow-preset">02 / LONG REQUEST</button>
             </div>
+            <div class="terminal-options"><button type="button" id="terminal-focus">FOCUS TERMINAL</button><span>PHOSPHOR</span><button type="button" data-phosphor="white" aria-pressed="true">WHITE</button><button type="button" data-phosphor="amber" aria-pressed="false">AMBER</button><button type="button" data-phosphor="green" aria-pressed="false">GREEN</button></div>
           </form>
         </section>
 
         <section class="inspector-card" aria-labelledby="inspector-heading">
           <div class="inspector-header">
-            <div><span class="card-overline">LIVE OBSERVATION</span><h2 id="inspector-heading">System status</h2></div>
+            <div><span class="card-overline">2026 ANALYSIS / NOT A HISTORIC SCREEN</span><h2 id="inspector-heading">Lab status</h2></div>
             <span class="status-pill" id="backend-status"><span class="status-light"></span> CONNECTING</span>
           </div>
           <div class="mode-select" aria-label="C version">
@@ -71,13 +72,14 @@
           </div>
           <div class="status-grid">
             <div class="status-tile"><span class="tile-label">USER ROLE</span><strong id="role-value">—</strong><span id="role-detail">No test yet</span></div>
-            <div class="status-tile"><span class="tile-label">RESTRICTED VAULT</span><strong id="vault-value">—</strong><span id="vault-detail">Awaiting input</span></div>
+            <div class="status-tile"><span class="tile-label">DEMO RESOURCE</span><strong id="vault-value">—</strong><span id="vault-detail">Awaiting input</span></div>
           </div>
           <div class="outcome" id="outcome"><span class="outcome-symbol">◉</span><div><strong>Ready for experiment</strong><p>Run the normal input to establish a baseline.</p></div></div>
           <div class="inspector-bottom"><span>INPUT LENGTH</span><strong id="input-length">—</strong><span class="separator">/</span><span>BUFFER CAPACITY</span><strong>16 bytes</strong></div>
         </section>
       </div>
 
+      <p class="analysis-label">MODERN INVESTIGATION TOOLS / THE PANELS BELOW WERE NOT PART OF THE 1988 TERMINAL</p>
       <div class="section-nav" role="tablist" aria-label="Explore the case">
         <button class="section-tab active" id="tab-memory" type="button" role="tab" aria-selected="true" aria-controls="panel-memory" data-view="memory"><span>01</span> MEMORY INSPECTOR</button>
         <button class="section-tab" id="tab-history" type="button" role="tab" aria-selected="false" aria-controls="panel-history" data-view="history"><span>02</span> THE 1988 INCIDENT</button>
@@ -88,6 +90,7 @@
         <div class="detail-head"><div><span class="card-overline">UNDER THE HOOD / STACK MEMORY</span><h2>What changed in memory?</h2></div><span class="legend"><i></i> NAME BUFFER <i></i> ROLE FIELD</span></div>
         <p class="detail-sub">These are the actual 24 bytes printed by the C program's local <code>Session</code> object. The boundary after byte 15 is the important part.</p>
         <div class="memory-box"><div class="memory-header"><span>MEMORY ADDRESS OFFSET</span><span id="memory-label">NO SNAPSHOT</span></div><div class="memory-grid" id="memory-grid" aria-label="24 memory bytes"></div><div class="memory-ruler"><span>00–15: NAME BUFFER</span><span>16–23: ROLE</span></div></div>
+        <div class="trace-controls" aria-label="Memory write replay"><span>RECONSTRUCTED BYTE-BY-BYTE WRITES</span><span id="trace-counter">—</span><button id="trace-reset" type="button">RESET</button><button id="trace-next" type="button">NEXT BYTE</button><button id="trace-play" type="button">PLAY</button></div>
         <div class="memory-explain"><span class="info-icon">i</span><p id="memory-explain">Run a test to see real byte values from the C demonstration.</p></div>
       </section>
 
@@ -95,8 +98,8 @@
         <div class="detail-head"><div><span class="card-overline">CASE FILE / 1988</span><h2>The Morris Worm</h2></div><span class="archive-stamp">ARCHIVE / 001</span></div>
         <div class="history-hero"><span>02 NOVEMBER 1988</span><strong>A small memory bug helped a worm spread across the early Internet.</strong></div>
         <div class="history-grid">
-          <article><span class="history-count">01 / ENTRY POINT</span><h3>UNIX finger service</h3><p>The historical worm exploited a buffer overflow in the <code>fingerd</code> service, which answered user-information requests.</p></article>
-          <article><span class="history-count">02 / CONSEQUENCE</span><h3>Unauthorized execution</h3><p>The overflow could redirect a program's execution. The actual worm also used other weaknesses to spread.</p></article>
+          <article><span class="history-count">01 / ENTRY POINT</span><h3>UNIX finger service</h3><p>The historical worm exploited a stack buffer overflow in the <code>fingerd</code> daemon, which answered network requests for user information.</p></article>
+          <article><span class="history-count">02 / CONSEQUENCE</span><h3>Unauthorized execution</h3><p>Unsafe input handling with <code>gets()</code> and a 512-byte local buffer allowed control-flow corruption. The worm used additional weaknesses to spread.</p></article>
           <article><span class="history-count">03 / RESPONSE</span><h3>Fix the unsafe input</h3><p>Administrators patched or disabled vulnerable services. Limiting input length was an important part of preventing this class of error.</p></article>
         </div>
         <p class="source-note">This lab is a simplified reconstruction, not the original worm or original exploit. Read: <a href="https://datatracker.ietf.org/doc/html/rfc1135" target="_blank" rel="noopener noreferrer">RFC 1135</a> · <a href="https://cwe.mitre.org/data/definitions/121.html" target="_blank" rel="noopener noreferrer">MITRE CWE-121</a></p>
@@ -106,15 +109,16 @@
         <div class="detail-head"><div><span class="card-overline">SECURITY ENGINEERING / SIDE-BY-SIDE</span><h2>What does the patch change?</h2></div><span class="archive-stamp">BEFORE / AFTER</span></div>
         <p class="detail-sub">The fix checks the size before copying. Repeat the same crafted input against both versions and compare their behavior.</p>
         <div class="code-compare"><div class="code-panel"><div class="code-heading"><span class="small-square danger-square"></span> VULNERABLE</div><pre><code>Session session = {{0}, "GUEST"};
-strcpy(session.name, argv[1]);</code></pre><p>Copies input without checking the 16-byte name buffer.</p></div><div class="code-panel"><div class="code-heading"><span class="small-square safe-square"></span> PATCHED</div><pre><code>if (strlen(argv[1]) >= sizeof(session.name)) {
+/* Controlled educational model: bytes cross
+   the name field into the adjacent role. */</code></pre><p>Our controlled C model writes through the containing 24-byte object without enforcing the 16-byte name boundary; it is not the original unsafe fingerd code.</p></div><div class="code-panel"><div class="code-heading"><span class="small-square safe-square"></span> PATCHED</div><pre><code>if (strlen(argv[1]) >= sizeof(session.name)) {
     puts("STATUS: INPUT REJECTED");
 } else {
     memcpy(session.name, argv[1], strlen(argv[1]) + 1);
 }</code></pre><p>Checks capacity, including the string terminator, before copying.</p></div></div>
-        <button class="apply-button" type="button" id="try-patch">SWITCH TO PATCHED VERSION <span aria-hidden="true">↗</span></button>
+        <button class="apply-button" type="button" id="try-patch">RETEST SAME INPUT WITH PATCHED C <span aria-hidden="true">↗</span></button>
       </section>
 
-      <footer><span>COMP 211 / STACK BUFFER OVERFLOWS</span><span>EDUCATIONAL RECONSTRUCTION · RUNS LOCALLY</span><span>NO NETWORK TARGETS</span></footer>
+      <footer><span>COMP 211 / STACK BUFFER OVERFLOWS</span><span>1988-STYLE INTERFACE · RUNS LOCALLY</span><span>NO NETWORK TARGETS</span></footer>
     </main>
   </div>
 </body>
