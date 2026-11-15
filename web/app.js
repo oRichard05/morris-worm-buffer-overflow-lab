@@ -45,9 +45,6 @@ function byteText(number) {
 function byteHex(number) {
   return '0x' + number.toString(16).toUpperCase().padStart(2, '0');
 }
-function fieldText(data) {
-  return data.slice(16, 24).map(value => value === 0 ? '\0' : String.fromCharCode(value)).join('').split('\0')[0];
-}
 function writeLine(text = '') {
   const line = document.createElement('div');
   line.className = 'line';
@@ -493,7 +490,6 @@ function switchMode(nextMode) {
   closeAnalysis();
   input.value = previous ? 'finger ' + previous + '@research-vax' : '';
 }
-$('guide-run').addEventListener('mouseenter', () => {});
 $('inspect-link').addEventListener('click', showAnalysis);
 $('back-terminal').addEventListener('click', closeAnalysis);
 $('lesson-previous').addEventListener('click', () => {
