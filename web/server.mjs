@@ -50,7 +50,12 @@ function executeDemo(mode, name) {
       maxBuffer: 16 * 1024,
       windowsHide: true
     }, (error, stdout, stderr) => {
-      if (error) return reject(new Error(`C program failed: ${stderr || error.message}`));
+      if (error) {
+        const reason = stderr.trim() || (error.signal
+          ? `process stopped with signal ${error.signal}`
+          : `process exited with code ${error.code}`);
+        return reject(new Error(`C demonstration stopped: ${reason}`));
+      }
       try { resolve(parseOutput(stdout, mode)); }
       catch (parseError) { reject(parseError); }
     });
