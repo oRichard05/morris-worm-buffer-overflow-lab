@@ -5,6 +5,9 @@ const glass = document.getElementById('glass');
 const form = document.getElementById('command-form');
 const input = document.getElementById('command-input');
 const memoryGrid = document.getElementById('memory-grid');
+const inspectLink = document.getElementById('inspect-link');
+const previousButton = document.getElementById('step-previous');
+const nextButton = document.getElementById('step-next');
 
 const users = {
   alice: { name: 'Alice Morgan', tty: 'tty01', home: '/usr/alice' },
@@ -17,6 +20,7 @@ let lastName = '';
 let busy = false;
 const commands = [];
 let historyIndex = 0;
+let lessonStep = 0;
 
 function write(message = '') {
   const div = document.createElement('div');
@@ -71,6 +75,7 @@ async function remoteFinger(name) {
     if (!response.ok) throw new Error(data.error || 'remote query failed');
     lastResult = data;
     lastName = name;
+    if (name.length >= 16) inspectLink.hidden = false;
     if (data.status === 'INPUT REJECTED') {
       write('finger: remote request rejected');
     } else if (data.role === 'ADMIN' && data.vault === 'UNLOCKED') {
@@ -167,38 +172,110 @@ async function run(raw) {
     default: write(command + ': Command not found.');
   }
 }
+function baseMemory() {
+  return [...Array(16).fill(0), 71, 85, 69, 83, 84, 0, 0, 0];
+}
+
+function renderLesson() {
+  if (!lastResult) return;
+  const rejected = lastResult.status === 'INPUT REJECTED';
+  const isLong = lastName.length >= 16;
+  const initial = baseMemory();
+  const letters = [...lastName].map(c => c.charCodeAt(0)).concat(0);
+  let bytes = initial.slice();
+
+  if (lessonStep === 1) {
+    for (let i = 0; i < Math.min(letters.length, 16); i++) bytes[i] = letters[i];
+  } else if (lessonStep >= 2) {
+    bytes = lastResult.memory.map(value => parseInt(value, 16));
+  }
+
+  const steps = [
+    {
+      title: 'Where does the name go?',
+      description: 'The program reserves 16 bytes for a name. A second field, the role, sits immediately beside it.',
+      explanation: 'Each box is one byte. Names also need an extra byte at the end to mark where the string stops.'
+    },
+    {
+      title: 'The name is too long',
+      description: 'The request contains ' + lastName.length + ' characters. Including the string-ending byte, it needs ' + (lastName.length + 1) + ' bytes.',
+      explanation: isLong
+        ? 'The name area only holds 16 bytes. The displayed first 16 writes are hypothetical if the patched program rejected this request.'
+        : 'This input fits. There is room for the final string-ending byte.'
+    },
+    {
+      title: rejected ? 'The fix stops the copy' : 'The extra bytes cross the boundary',
+      description: rejected
+        ? 'This time the C program checked the length first. It rejected the request instead of writing beyond the name field.'
+        : isLong
+          ? 'The unchecked input changed bytes belonging to the neighboring role. The final bytes shown here came from the C program.'
+          : 'The name stayed inside its own space. The neighboring field was not modified.',
+      explanation: rejected
+        ? 'The role still reads GUEST. No input bytes were copied.'
+        : isLong
+          ? 'The amber boxes show the neighboring memory affected by the input in our controlled model.'
+          : 'The neighboring role still reads GUEST.'
+    },
+    {
+      title: 'Why was this dangerous in 1988?',
+      description: 'The real fingerd also accepted text without checking its length, but used a 512-byte buffer. A carefully crafted request could change where the program executed next.',
+      explanation: 'Our 16-byte example changes a nearby field to make the problem visible. It is not the original worm or a reproduction of its exploit.'
+    }
+  ];
+
+  const detail = steps[lessonStep];
+  document.getElementById('step-number').textContent = 'STEP ' + (lessonStep + 1) + ' OF 4';
+  document.getElementById('step-title').textContent = detail.title;
+  document.getElementById('step-description').textContent = detail.description;
+  document.getElementById('memory-explanation').textContent = detail.explanation;
+  document.getElementById('memory-label').textContent = lessonStep === 0
+    ? 'BEFORE INPUT' : lessonStep === 1 ? 'FIRST 16 BYTES' : 'RESULT FROM C';
+
+  memoryGrid.replaceChildren();
+  bytes.forEach((number,index) => {
+    const cell = document.createElement('div');
+    const role = index >= 16;
+    const overwritten = lessonStep >= 2 && !rejected &&
+      lastResult.mode === 'vulnerable' && role && isLong && index <= lastName.length;
+    cell.className = 'memory-byte' + (role ? ' role' : '') + (overwritten ? ' overwritten' : '');
+    const char = document.createElement('span');
+    char.textContent = number === 0 ? '·' :
+      number >= 32 && number <= 126 ? String.fromCharCode(number) : '·';
+    const offset = document.createElement('span');
+    offset.className = 'offset';
+    offset.textContent = String(index);
+    cell.title = 'Byte ' + index + ': 0x' + number.toString(16).toUpperCase().padStart(2,'0');
+    cell.append(char,offset);
+    memoryGrid.append(cell);
+  });
+  previousButton.disabled = lessonStep === 0;
+  nextButton.textContent = lessonStep === 3 ? 'Start over ↻' : 'Next →';
+}
+
 function showAnalysis() {
   if (!lastResult) return;
-  memoryGrid.replaceChildren();
-  const {memory,status,mode:requestMode} = lastResult;
-  for (let i = 0; i < memory.length; i++) {
-    const value = parseInt(memory[i], 16);
-    const cell = document.createElement('div');
-    const role = i >= 16;
-    const changed = role && requestMode === 'vulnerable' && status !== 'INPUT REJECTED' && i <= lastName.length;
-    cell.className = 'memory-byte' + (role ? ' role' : '') + (changed ? ' overwritten' : '');
-    const h = document.createElement('span');
-    h.textContent = memory[i];
-    const c = document.createElement('span');
-    c.textContent = value === 0 ? '␀' : value >= 32 && value <= 126 ? String.fromCharCode(value) : '·';
-    cell.append(h,c);
-    cell.title = 'Offset ' + i;
-    memoryGrid.append(cell);
-  }
-  document.getElementById('memory-label').textContent = '24 BYTES · ' + requestMode.toUpperCase();
-  document.getElementById('memory-explanation').textContent =
-    status === 'INPUT REJECTED' ? 'The patched program rejected this long input before copying.'
-      : lastName.length >= 16 ? 'The input crossed the 16-byte name field. The highlighted bytes are adjacent role data in our controlled C model.'
-      : 'The input fitted inside the name buffer; the adjacent data remained intact.';
+  lessonStep = 0;
+  renderLesson();
   terminalView.hidden = true;
   analysisView.hidden = false;
   window.scrollTo(0,0);
 }
+
 function closeAnalysis() {
   analysisView.hidden = true;
   terminalView.hidden = false;
   input.focus();
 }
+
+previousButton.addEventListener('click', () => {
+  lessonStep = Math.max(0,lessonStep - 1);
+  renderLesson();
+});
+nextButton.addEventListener('click', () => {
+  lessonStep = lessonStep === 3 ? 0 : lessonStep + 1;
+  renderLesson();
+});
+inspectLink.addEventListener('click', showAnalysis);
 form.addEventListener('submit', async event => {
   event.preventDefault();
   if (busy) return;
@@ -228,10 +305,12 @@ terminalView.addEventListener('click', () => input.focus());
 document.getElementById('return-terminal').addEventListener('click', closeAnalysis);
 document.getElementById('apply-patch').addEventListener('click', () => {
   mode = 'patched';
+  inspectLink.hidden = true;
   closeAnalysis();
 });
 document.getElementById('reset-demo').addEventListener('click', () => {
   mode = 'vulnerable';
+  inspectLink.hidden = true;
   closeAnalysis();
 });
 document.addEventListener('keydown', event => {
