@@ -18,7 +18,7 @@ Open **http://127.0.0.1:4173** in your browser. The website and C programs run e
 ### Demo sequence
 
 1. In **Vulnerable** mode, run the normal input (`alice`). The role stays `GUEST` and the vault stays locked.
-2. Use **Crafted Input** (`AAAAAAAAAAAAAAAAADMIN`) and run it. The unchecked copy extends beyond the 16-byte name buffer into the adjacent role field, causing the demo to display `ADMIN` and unlock its fictional vault.
+2. Use **Crafted Input** (`AAAAAAAAAAAAAAAAADMIN`) and run it. The demo copies into the full session byte representation without checking the 16-byte name field's boundary. The input overwrites the adjacent role bytes, causing the demo to display `ADMIN` and unlock its fictional vault.
 3. Open **Memory Inspector** to see the actual 24-byte snapshot printed by the C program: 16 bytes for the name and 8 bytes for the role.
 4. Open **The 1988 Incident** for historical context.
 5. Select **Patched** mode and rerun the same input. The length check rejects the input, preserving `GUEST` and a locked vault.
@@ -41,7 +41,7 @@ npm test
 
 ```text
 lab/
-  vulnerable.c    Unchecked copy into a local stack object
+  vulnerable.c    Controlled byte-level name-buffer overrun demonstration
   patched.c       Bounds check before copying
   Makefile        Compiles both programs
   check.sh        Checks the expected outcomes
@@ -57,7 +57,7 @@ package.json      Local commands
 
 The **Morris Worm** spread across parts of the early Internet in November 1988, using multiple weaknesses, including a stack buffer overflow in the UNIX `fingerd` service. The historical vulnerability could redirect execution; it did **not** grant access by overwriting a `GUEST` role field.
 
-This project deliberately uses a simplified fictional session object to make adjacent-data corruption easy to observe. The memory inspector displays actual bytes from the demonstration program, but this is **not** the original `fingerd` source, the original worm, or a complete recreation of the historical exploit. Out-of-bounds writes are undefined behavior in C; this demo has been checked in a controlled build, and results are not guaranteed across every compiler and platform.
+This project deliberately uses a simplified fictional session object to make adjacent-data corruption easy to observe. The memory inspector displays actual bytes from the demonstration program, but this is **not** the original `fingerd` source, the original worm, or a complete recreation of the historical exploit.\n\n**Controlled demonstration:** Modern C libraries or compilers can stop a real out-of-bounds `strcpy` before its effects are visible. For repeatable classroom behavior, the demonstration writes through the `unsigned char` representation of the entire 24-byte session object, with a 21-character input limit. It crosses the logical 16-byte name boundary and visibly changes the neighboring role, but never writes outside the enclosing session object. This is a byte-level model of the corruption caused by a stack buffer overflow, **not** a claim to reproduce the undefined behavior of the historical bug.
 
 Only use the illustrated inputs in a controlled local environment. This repository does not include self-propagating code or a publicly accessible vulnerable service.
 
