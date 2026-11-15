@@ -22,71 +22,60 @@
         </form>
       </section>
 
-      <aside class="trace-panel" aria-label="Memory examination and execution trace">
-        <header class="inspector-header">
-          <div>
-            <span class="eyebrow-small">MEMORY EXAMINATION / LOCAL C</span>
-            <h2>Inside the process</h2>
-          </div>
-          <span id="trace-state" class="trace-state" aria-live="polite">READY</span>
-        </header>
+      <aside class="trace-panel" aria-label="Animated educational memory model">
+        <div class="panel-top">
+          <span>INSIDE THE COMPUTER</span>
+          <span id="trace-state" aria-live="polite">READY</span>
+        </div>
 
-        <section class="next-action" aria-label="Next experiment">
-          <span id="guide-step" class="guide-step">01 / BASELINE</span>
-          <h3 id="guide-title">Start with a short name</h3>
-          <p id="guide-description">Watch a normal request stay inside its buffer.</p>
+        <section class="next-action" aria-label="Suggested experiment">
+          <span id="guide-step" class="guide-step">01 / START</span>
+          <h2 id="guide-title">Try a normal name</h2>
+          <p id="guide-description" class="guide-description">See how the name fits.</p>
           <div class="command-suggestion">
             <code id="guide-command">finger alice@research-vax</code>
-            <button id="guide-run" type="button" aria-label="Run suggested command">Run <span aria-hidden="true">↵</span></button>
+            <button id="guide-run" type="button">RUN <span aria-hidden="true">↵</span></button>
           </div>
-          <button id="inspect-link" class="explain-action" type="button" hidden>Understand what happened <span aria-hidden="true">↗</span></button>
+          <button id="inspect-link" class="explain-action" type="button" hidden>SEE WHY IT FAILED <span aria-hidden="true">↗</span></button>
         </section>
 
-        <section class="dump-section" aria-label="Reconstructed stack memory">
-          <div class="dump-heading">
-            <span>STACK FRAME / 24 BYTES</span>
-            <span id="trace-source">BEFORE INPUT</span>
+        <section class="memory-stage" aria-label="Memory being filled, one byte at a time">
+          <div class="region-head"><strong>NAME</strong><span>16 SPACES</span></div>
+          <div id="name-bytes" class="memory-cells name-cells" aria-label="16 character spaces reserved for the name"></div>
+          <div id="boundary-line" class="limit-line" aria-live="polite">
+            <span class="limit-rule"></span>
+            <strong id="boundary-caption">16-BYTE LIMIT</strong>
+            <span class="limit-rule"></span>
           </div>
-          <div class="request-line">
-            <span>REQUEST</span>
-            <code id="input-preview">—</code>
-            <span id="input-length">0 B</span>
-          </div>
-
-          <div class="dump-table" aria-label="Memory hex dump: address, hexadecimal bytes and ASCII">
-            <div class="dump-column-headers" aria-hidden="true">
-              <span>OFFSET</span><span>HEX BYTES / 00–07</span><span>ASCII</span>
-            </div>
-            <div class="dump-region-title"><span>name[16]</span><span>16 BYTES</span></div>
-            <div id="name-bytes" class="dump-rows" aria-label="Name buffer hex dump"></div>
-            <div id="boundary-line" class="boundary-line"><span>↑ END OF NAME BUFFER / 0x10</span></div>
-            <div class="dump-region-title next-title"><span>next_step[8]</span><span>8 BYTES</span></div>
-            <div id="next-bytes" class="dump-rows" aria-label="Adjacent next-step hex dump"></div>
-          </div>
+          <div class="region-head"><strong>NEXT STEP</strong><span>8 SPACES</span></div>
+          <div id="next-bytes" class="memory-cells next-cells" aria-label="8 neighboring character spaces for the next step"></div>
         </section>
 
-        <section id="flow-visual" class="execution-section" aria-label="Symbolic execution flow">
-          <span class="section-eyebrow">SYMBOLIC EXECUTION PATH</span>
-          <div class="execution-path">
-            <div><small>BEFORE</small><strong>RETURN</strong></div>
-            <span class="execution-arrow" aria-hidden="true">→</span>
-            <div><small>AFTER</small><strong id="flow-value">—</strong></div>
+        <section id="flow-visual" class="execution-section" aria-label="Symbolic outcome of the request">
+          <span class="outcome-label">WHAT THE PROGRAM WOULD DO NEXT</span>
+          <div class="outcome-display">
+            <span class="before-value">RETURN</span>
+            <span class="outcome-arrow" aria-hidden="true">→</span>
+            <strong id="flow-value">—</strong>
           </div>
         </section>
 
-        <section class="trace-playback" aria-label="Byte write replay">
+        <section class="trace-playback" aria-label="Memory write replay">
           <div class="playback-top">
-            <span id="trace-caption" aria-live="polite">Run a query to inspect memory.</span>
+            <span id="trace-caption" aria-live="polite">Run the example to watch the memory fill.</span>
             <span id="trace-count">0 / 0</span>
           </div>
           <div class="playback-controls">
-            <button id="trace-play" type="button" disabled>Replay</button>
-            <input id="trace-seek" type="range" min="0" max="1" step="1" value="0" disabled aria-label="Scrub the reconstructed memory writes">
+            <button id="trace-play" type="button" disabled>REPLAY</button>
+            <input id="trace-seek" type="range" min="0" max="1" step="1" value="0" disabled aria-label="Move through the reconstructed byte writes">
           </div>
-          <p id="byte-info" class="byte-info">Click a byte to inspect its address.</p>
         </section>
 
-        <p class="trace-foot">Modern teaching view · byte writes reconstructed from the C result, not a live debugger or an original 1988 screen.</p>
+        <p id="byte-info" class="byte-info" hidden></p>
+        <p id="trace-source" class="sr-only">BEFORE INPUT</p>
+        <p id="input-preview" class="sr-only">—</p>
+        <p id="input-length" class="sr-only">0 B</p>
+        <p class="trace-foot">Educational C model · not the original 1988 memory layout or a live debugger.</p>
       </aside>
     </div>
   </main>
