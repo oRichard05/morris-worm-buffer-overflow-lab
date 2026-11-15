@@ -3,69 +3,78 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#080b09">
-  <title>research-vax — UNIX</title>
+  <meta name="theme-color" content="#131715">
+  <title>research-vax — User Information Service</title>
   <link rel="stylesheet" href="/styles.css">
   <script type="module" src="/app.js"></script>
 </head>
 <body>
-  <main id="terminal-view" class="terminal-view">
-    <div class="terminal" aria-label="UNIX terminal reconstruction">
-      <div id="terminal-output" class="terminal-output" role="log" aria-live="polite" aria-relevant="additions"></div>
-      <form id="command-form" class="command-form" autocomplete="off">
-        <label class="prompt" for="command-input">research-vax%&nbsp;</label>
-        <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="UNIX command" maxlength="120">
-      </form>
-    </div>
+  <main id="program-view" class="program-view">
+    <section class="terminal" aria-label="UNIX user information terminal">
+      <div class="terminal-frame">
+        <header class="machine-label">
+          <span>RESEARCH-VAX / TERMINAL 01</span>
+          <span>4.3BSD UNIX</span>
+        </header>
+        <div class="screen" id="screen">
+          <div id="program-display" class="program-display" aria-live="polite"></div>
+          <form id="entry-form" class="entry-form" autocomplete="off">
+            <label id="entry-prompt" for="entry-input">Selection:</label>
+            <input id="entry-input" type="text" aria-label="Program input" spellcheck="false" autocapitalize="off" autocomplete="off" maxlength="60">
+          </form>
+          <p id="program-hint" class="program-hint">ENTER: select</p>
+        </div>
+        <footer class="machine-footer">
+          <span>VIDEO TERMINAL</span>
+          <span id="power-indicator"><i></i> ONLINE</span>
+        </footer>
+      </div>
+    </section>
   </main>
 
   <main id="analysis-view" class="analysis-view" hidden>
     <div class="analysis-wrap">
-      <button id="return-terminal" type="button" class="back-link">← Back to terminal</button>
-      <div class="analysis-heading">
-        <span>MEMORY INVESTIGATION · EDUCATIONAL RECONSTRUCTION</span>
+      <button id="return-program" type="button" class="text-button">← Return to computer</button>
+      <header class="analysis-head">
+        <span>MEMORY INVESTIGATION · MODERN EDUCATIONAL VIEW</span>
         <h1>What happened?</h1>
-        <p id="analysis-intro">A local C program copied data beyond its name buffer into the next field.</p>
-      </div>
+        <p>These are the actual bytes produced by our C demonstration, not a reconstruction of the original 1988 exploit.</p>
+      </header>
 
       <section class="analysis-section">
-        <div class="section-title">
-          <h2>Memory after the request</h2>
-          <p id="memory-summary">24 bytes: 16 for the name, 8 for the role.</p>
+        <div class="section-heading">
+          <h2>Session memory</h2>
+          <span id="memory-label">NO EXPERIMENT</span>
         </div>
-        <div class="memory-grid" id="memory-grid" aria-label="Memory contents"></div>
-        <div class="memory-boundary">
-          <span>Name buffer · offsets 0–15</span>
-          <span>Role field · offsets 16–23</span>
+        <div id="memory-grid" class="memory-grid" aria-label="24 memory bytes"></div>
+        <div class="memory-legend">
+          <span>0–15 · Name buffer</span>
+          <span>16–23 · Role field</span>
         </div>
-        <p class="analysis-note" id="analysis-note"></p>
+        <p id="memory-explanation" class="section-description"></p>
       </section>
 
       <section class="analysis-section compare">
         <div>
-          <h2>Before the fix</h2>
-          <pre>char name[16];
-char role[8];
-
-// No check for the name field boundary</pre>
-          <p>Our controlled model writes across a field boundary inside one stack object.</p>
+          <h2>Why it happened</h2>
+          <p>Our simplified C model writes bytes without respecting the <code>name[16]</code> boundary. Characters beyond it can modify the adjacent role.</p>
         </div>
         <div>
-          <h2>After the fix</h2>
-          <pre>if (strlen(input) >= sizeof(session.name)) {
-    puts("INPUT REJECTED");
-} else {
-    memcpy(session.name, input, strlen(input) + 1);
-}</pre>
-          <p>Reject the input before copying if it cannot fit, including the terminating byte.</p>
+          <h2>How we fix it</h2>
+          <p>Check the input length before copying. A 16-byte character array can store at most 15 characters plus the terminating <code>\0</code>.</p>
         </div>
       </section>
 
-      <section class="analysis-section history">
-        <h2>The real 1988 incident</h2>
-        <p>The Morris Worm exploited a stack buffer overflow in the UNIX <code>fingerd</code> service. Unlike our simplified role-field demonstration, the historical flaw could redirect program execution. The worm also used other methods to spread. Administrators patched or disabled vulnerable services and replaced unsafe input handling.</p>
-        <p class="source">Sources: <a href="https://datatracker.ietf.org/doc/html/rfc1135" target="_blank" rel="noopener noreferrer">RFC 1135</a> · <a href="https://cwe.mitre.org/data/definitions/121.html" target="_blank" rel="noopener noreferrer">MITRE CWE-121</a></p>
+      <section class="analysis-section">
+        <h2>The real incident: November 1988</h2>
+        <p>The Morris Worm exploited an unchecked input in the UNIX <code>fingerd</code> service, among other weaknesses. Its stack buffer overflow could redirect execution. Our fictional menu and ADMIN field are teaching devices, not features of the historical attack. Administrators addressed the vulnerability through software patches and safer input handling.</p>
+        <p class="references">Sources: <a href="https://datatracker.ietf.org/doc/html/rfc1135" target="_blank" rel="noopener noreferrer">RFC 1135</a> · <a href="https://cwe.mitre.org/data/definitions/121.html" target="_blank" rel="noopener noreferrer">MITRE CWE-121</a></p>
       </section>
+
+      <div class="analysis-actions">
+        <button id="apply-patch" class="action-button" type="button">Apply fix and return to computer</button>
+        <button id="reset-demo" class="text-button" type="button">Restart vulnerable experiment</button>
+      </div>
     </div>
   </main>
 </body>
