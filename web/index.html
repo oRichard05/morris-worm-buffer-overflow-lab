@@ -20,36 +20,55 @@
       </section>
 
       <aside class="memory-monitor" aria-label="Educational memory monitor">
-        <div class="monitor-topline">
-          <span>MEMORY INSPECTOR</span>
-          <span>LOCAL C MODEL</span>
+        <div class="inspector-header">
+          <div class="inspector-identity">
+            <span class="inspector-index">01 / LOCAL ANALYSIS</span>
+            <h2>Memory inspector</h2>
+          </div>
+          <button type="button" id="memory-mode-toggle" class="mode-toggle" aria-label="Show hexadecimal byte values" aria-pressed="false">HEX <span aria-hidden="true">↔</span></button>
         </div>
-        <h2 class="monitor-title">What's happening in memory?</h2>
-        <div class="monitor-state">
-          <span id="snapshot-state" aria-live="polite">NO QUERY YET</span>
-          <span class="monitor-capacity">24 BYTES</span>
+
+        <div class="memory-status">
+          <span id="snapshot-state" class="status-indicator" aria-live="polite">NO QUERY YET</span>
+          <span id="snapshot-context" class="snapshot-context">24-BYTE SESSION</span>
         </div>
+
         <div class="memory-region name-region">
-          <div class="region-heading"><span>NAME</span><span>16 BYTES</span></div>
+          <div class="region-heading"><span><b>01</b> NAME</span><span>00–0F / 16 BYTES</span></div>
           <div id="snapshot-name" class="snapshot-bytes" aria-label="Name buffer, bytes 0 to 15"></div>
         </div>
+
+        <div id="memory-boundary" class="memory-boundary" aria-live="polite">
+          <span class="boundary-marker"></span>
+          <span>BUFFER ENDS AT 0x10</span>
+          <span class="boundary-marker"></span>
+        </div>
+
         <div class="memory-region role-region">
-          <div class="region-heading"><span>ROLE</span><span>8 BYTES</span></div>
-          <div id="snapshot-role" class="snapshot-bytes" aria-label="Role field, bytes 16 to 23"></div>
+          <div class="region-heading"><span><b>02</b> ROLE</span><span>10–17 / 8 BYTES</span></div>
+          <div id="snapshot-role" class="snapshot-bytes" aria-label="Adjacent role field, bytes 16 to 23"></div>
         </div>
-        <div class="snapshot-summary">
-          <p id="snapshot-result" class="snapshot-result" aria-live="polite">Run a lookup to see the memory.</p>
-          <p id="snapshot-context" class="snapshot-context">Waiting for the first C execution.</p>
+
+        <div class="role-transition" aria-label="Role before and after last request">
+          <div class="role-side"><span>EXPECTED</span><strong>GUEST</strong></div>
+          <div class="transition-arrow" aria-hidden="true">→</div>
+          <div class="role-side role-current"><span>AFTER REQUEST</span><strong id="role-value">—</strong></div>
         </div>
+
+        <div class="byte-inspection">
+          <p id="snapshot-result" class="snapshot-result" aria-live="polite">Run a query to inspect its memory.</p>
+          <p id="byte-detail" class="byte-detail">Select a byte to inspect its address and value.</p>
+        </div>
+
         <div class="guide-pane">
-          <p id="guide-step" class="guide-step">01 / FIRST REQUEST</p>
-          <h3 id="guide-title">Start with a normal lookup</h3>
-          <p id="guide-description" class="guide-description">See how a short name fits in memory.</p>
+          <div class="guide-meta"><span id="guide-step">01 / NORMAL LOOKUP</span><span>NEXT ACTION</span></div>
+          <h3 id="guide-title">Try a normal request</h3>
+          <p id="guide-description" class="guide-description">Compare what happens when an input fits.</p>
           <code id="guide-command" class="guide-command">finger alice@research-vax</code>
           <button id="guide-insert" type="button" class="guide-button">Run this command <span aria-hidden="true">↗</span></button>
-          <button type="button" id="inspect-link" class="guide-button secondary" hidden>Understand what happened <span aria-hidden="true">↗</span></button>
+          <button type="button" id="inspect-link" class="guide-button secondary" hidden>Explain what happened <span aria-hidden="true">↗</span></button>
         </div>
-        <p class="snapshot-note">Modern teaching view · snapshots from C after each request, not a 1988 screen.</p>
+        <p class="snapshot-note">Educational memory snapshot after C execution · not a historical UNIX display.</p>
       </aside>
     </div>
   </main>
