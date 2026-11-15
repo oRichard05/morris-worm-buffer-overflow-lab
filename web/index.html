@@ -10,67 +10,47 @@
 </head>
 <body>
   <main id="terminal-view" class="terminal-view">
-    <div class="lab-shell">
-      <header class="lab-header">
-        <div class="lab-identity"><strong>MORRIS LAB</strong><span>1988 / RESEARCH-VAX</span></div>
-        <span class="reconstruction-label">HISTORICAL TERMINAL · MODERN MEMORY VIEW</span>
-      </header>
-
-      <section class="lab-guide" aria-label="Guided experiment">
-        <div class="guide-progress" aria-label="Experiment progress">
-          <span data-stage="1" class="active">01 <span>BASELINE</span></span>
-          <span data-stage="2">02 <span>OVERFLOW</span></span>
-          <span data-stage="3">03 <span>INVESTIGATE</span></span>
-          <span data-stage="4">04 <span>PATCH</span></span>
-        </div>
-        <div class="guide-content">
-          <div class="guide-copy">
-            <p id="guide-step" class="guide-step">01 / NORMAL REQUEST</p>
-            <h1 id="guide-title">Start with a user lookup</h1>
-            <p id="guide-description">Run a normal request. Watch what the C program stores in memory.</p>
-          </div>
-          <div class="guide-action">
-            <code id="guide-command" class="guide-command">finger alice@research-vax</code>
-            <button id="guide-insert" type="button" class="run-example">Run example <span aria-hidden="true">↗</span></button>
-          </div>
-        </div>
+    <div class="terminal-layout">
+      <section class="screen" id="glass" aria-label="Recreated 4.3BSD UNIX terminal">
+        <div class="screen-lines" id="terminal-output" role="log" aria-live="polite" aria-relevant="additions"></div>
+        <form id="command-form" class="command-form" autocomplete="off">
+          <label for="command-input">research-vax% </label>
+          <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="UNIX command" maxlength="160">
+        </form>
       </section>
 
-      <section class="terminal-section" aria-label="UNIX terminal">
-        <div class="section-heading"><span>UNIX TERMINAL</span><span>4.3BSD · 02 NOV 1988</span></div>
-        <div class="screen" id="glass" aria-label="4.3BSD UNIX terminal reconstruction">
-          <div class="screen-lines" id="terminal-output" role="log" aria-live="polite" aria-relevant="additions"></div>
-          <form id="command-form" class="command-form" autocomplete="off">
-            <label for="command-input">research-vax% </label>
-            <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="UNIX command" maxlength="160">
-          </form>
+      <aside class="memory-monitor" aria-label="Educational memory monitor">
+        <div class="monitor-topline">
+          <span>MEMORY INSPECTOR</span>
+          <span>LOCAL C MODEL</span>
         </div>
-      </section>
-
-      <section class="memory-section" aria-label="Memory after local C execution">
-        <div class="section-heading memory-heading">
-          <span>MEMORY / 24 BYTES <small>LOCAL C SNAPSHOT</small></span>
-          <span id="snapshot-state" class="snapshot-state" aria-live="polite">AWAITING INPUT</span>
+        <h2 class="monitor-title">What's happening in memory?</h2>
+        <div class="monitor-state">
+          <span id="snapshot-state" aria-live="polite">NO QUERY YET</span>
+          <span class="monitor-capacity">24 BYTES</span>
         </div>
-        <div class="memory-regions">
-          <div class="memory-region name-region">
-            <div class="region-heading"><span>NAME BUFFER</span><span>16 BYTES</span></div>
-            <div id="snapshot-name" class="snapshot-bytes" aria-label="Name buffer bytes"></div>
-          </div>
-          <div class="memory-region role-region">
-            <div class="region-heading"><span>ADJACENT ROLE</span><span>8 BYTES</span></div>
-            <div id="snapshot-role" class="snapshot-bytes" aria-label="Adjacent role field bytes"></div>
-          </div>
+        <div class="memory-region name-region">
+          <div class="region-heading"><span>NAME</span><span>16 BYTES</span></div>
+          <div id="snapshot-name" class="snapshot-bytes" aria-label="Name buffer, bytes 0 to 15"></div>
         </div>
-        <div class="memory-caption">
-          <div class="memory-caption-copy">
-            <p id="snapshot-result" class="snapshot-result" aria-live="polite">Run the first request to see the memory.</p>
-            <p id="snapshot-context" class="snapshot-context">Nothing has been executed in C yet.</p>
-          </div>
-          <button type="button" id="inspect-link" class="inspect-link" hidden>Understand the overflow <span aria-hidden="true">↗</span></button>
+        <div class="memory-region role-region">
+          <div class="region-heading"><span>ROLE</span><span>8 BYTES</span></div>
+          <div id="snapshot-role" class="snapshot-bytes" aria-label="Role field, bytes 16 to 23"></div>
         </div>
-        <p class="snapshot-note">Educational view: actual bytes after each C run, not real-time memory tracing or a screen from 1988.</p>
-      </section>
+        <div class="snapshot-summary">
+          <p id="snapshot-result" class="snapshot-result" aria-live="polite">Run a lookup to see the memory.</p>
+          <p id="snapshot-context" class="snapshot-context">Waiting for the first C execution.</p>
+        </div>
+        <div class="guide-pane">
+          <p id="guide-step" class="guide-step">01 / FIRST REQUEST</p>
+          <h3 id="guide-title">Start with a normal lookup</h3>
+          <p id="guide-description" class="guide-description">See how a short name fits in memory.</p>
+          <code id="guide-command" class="guide-command">finger alice@research-vax</code>
+          <button id="guide-insert" type="button" class="guide-button">Run this command <span aria-hidden="true">↗</span></button>
+          <button type="button" id="inspect-link" class="guide-button secondary" hidden>Understand what happened <span aria-hidden="true">↗</span></button>
+        </div>
+        <p class="snapshot-note">Modern teaching view · snapshots from C after each request, not a 1988 screen.</p>
+      </aside>
     </div>
   </main>
 
