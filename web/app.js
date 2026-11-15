@@ -21,6 +21,11 @@ const guideTitle = document.getElementById('guide-title');
 const guideDescription = document.getElementById('guide-description');
 const guideCommand = document.getElementById('guide-command');
 const guideInsert = document.getElementById('guide-insert');
+const memoryMonitor = document.querySelector('.memory-monitor');
+const memoryModeToggle = document.getElementById('memory-mode-toggle');
+const boundaryCopy = document.getElementById('boundary-copy');
+const roleValue = document.getElementById('role-value');
+const byteDetail = document.getElementById('byte-detail');
 
 
 const users = {
@@ -37,6 +42,9 @@ let historyIndex = 0;
 let lessonStep = 0;
 let replayTimer = null;
 let replayPosition = 0;
+let memoryDisplayMode = 'ascii';
+let snapshotBytes = null;
+let selectedByteIndex = null;
 
 function write(message = '') {
   const div = document.createElement('div');
@@ -198,55 +206,104 @@ function baseMemory() {
   return [...Array(16).fill(0), 71, 85, 69, 83, 84, 0, 0, 0];
 }
 
+function displayByte(value) {
+  if (value === null) return '·';
+  if (memoryDisplayMode === 'hex') return value.toString(16).toUpperCase().padStart(2, '0');
+  if (value === 0) return '·';
+  return value >= 32 && value <= 126 ? String.fromCharCode(value) : '·';
+}
+
+function byteDescription(index) {
+  const group = index < 16 ? 'NAME' : 'ROLE';
+  const offset = '0x' + index.toString(16).toUpperCase().padStart(2, '0');
+  if (!snapshotBytes) return offset + ' · ' + group + ' · waiting for data';
+  const value = snapshotBytes[index];
+  const hex = '0x' + value.toString(16).toUpperCase().padStart(2, '0');
+  const char = value === 0 ? 'NUL' : value >= 32 && value <= 126 ? "'" + String.fromCharCode(value) + "'" : 'non-printable';
+  const original = baseMemory()[index];
+  const altered = index >= 16 && value !== original;
+  return offset + ' · ' + group + ' · ' + hex + ' (' + char + ')'
+    + (altered ? ' · was 0x' + original.toString(16).toUpperCase().padStart(2, '0') : '');
+}
+
+function selectMemoryByte(index) {
+  if (!snapshotBytes) return;
+  selectedByteIndex = index;
+  byteDetail.textContent = byteDescription(index);
+  [...snapshotName.children, ...snapshotRole.children].forEach((cell, position) => {
+    cell.classList.toggle('selected', index === position);
+    cell.setAttribute('aria-pressed', String(index === position));
+  });
+}
+
 function updateSnapshot(result = null, name = '', running = false) {
   snapshotName.replaceChildren();
   snapshotRole.replaceChildren();
-
-  const bytes = result ? result.memory.map(hex => Number.parseInt(hex, 16)) : null;
+  snapshotBytes = result ? result.memory.map(hex => Number.parseInt(hex, 16)) : null;
   const original = baseMemory();
+  const rejected = result && result.status === 'INPUT REJECTED';
+  const changed = Boolean(snapshotBytes && snapshotBytes.slice(16).some((value, i) => value !== original[16 + i]));
+  memoryMonitor.classList.toggle('is-changed', changed);
+  memoryMonitor.classList.toggle('is-rejected', Boolean(rejected));
 
   for (let index = 0; index < 24; index++) {
-    const cell = document.createElement('span');
-    const value = bytes ? bytes[index] : null;
-    const changed = bytes && index >= 16 && value !== original[index];
+    const byte = snapshotBytes ? snapshotBytes[index] : null;
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.disabled = byte === null;
     cell.className = 'snapshot-byte'
-      + (bytes ? '' : ' placeholder')
-      + (changed ? ' changed' : '');
-
+      + (byte === null ? ' placeholder' : '')
+      + (changed && index >= 16 && byte !== original[index] ? ' changed' : '');
+    cell.setAttribute('aria-pressed', 'false');
     const character = document.createElement('span');
     character.className = 'byte-character';
-    character.textContent = value === null || value === 0
-      ? '·'
-      : value >= 32 && value <= 126 ? String.fromCharCode(value) : '·';
-
+    character.textContent = displayByte(byte);
     const offset = document.createElement('span');
     offset.className = 'byte-index';
-    offset.textContent = index.toString().padStart(2, '0');
-
-    cell.title = value === null ? 'Byte ' + index + ': waiting for C'
-      : 'Byte ' + index + ': 0x' + value.toString(16).toUpperCase().padStart(2, '0');
+    offset.textContent = index.toString(16).toUpperCase().padStart(2, '0');
+    cell.title = byte === null ? 'No C output yet' : byteDescription(index);
     cell.setAttribute('aria-label', cell.title);
+    cell.addEventListener('click', () => selectMemoryByte(index));
     cell.append(character, offset);
     (index < 16 ? snapshotName : snapshotRole).append(cell);
   }
 
   if (!result) {
-    snapshotState.textContent = running ? 'RUNNING C' : 'NO QUERY YET';
-    snapshotResult.textContent = running ? 'Reading the C program’s output…' : 'Run the first request to see the memory.';
-    snapshotContext.textContent = running ? 'Waiting for the 24-byte snapshot.' : 'Nothing has been executed in C yet.';
+    selectedByteIndex = null;
+    snapshotState.textContent = running ? 'READING C…' : 'NO QUERY YET';
+    snapshotContext.textContent = running ? 'AWAITING 24 BYTES' : '24-BYTE SESSION';
+    snapshotResult.textContent = running ? 'Waiting for the C result…' : 'Run a query to inspect its memory.';
+    byteDetail.textContent = 'Select a byte to inspect its address and value.';
+    roleValue.textContent = '—';
+    boundaryCopy.textContent = 'BUFFER ENDS AT 0x10';
     return;
   }
 
-  const rejected = result.status === 'INPUT REJECTED';
-  const changed = bytes.slice(16).some((value, index) => value !== original[16 + index]);
-  snapshotState.textContent = rejected ? 'INPUT REJECTED' : changed ? 'BOUNDARY CROSSED' : 'NORMAL';
+  snapshotState.textContent = rejected ? 'INPUT REJECTED' : changed ? 'OVERFLOW DETECTED' : 'NO OVERFLOW';
+  snapshotContext.textContent = name.length + ' CHARACTERS · ' + result.mode.toUpperCase();
   snapshotResult.textContent = rejected
-    ? 'Request rejected. The role is still GUEST.'
+    ? 'Length checked. Adjacent memory is safe.'
     : changed
-      ? 'The neighboring role changed: GUEST → ' + (result.role || '(empty)')
-      : 'The name fits. The neighboring role remains ' + result.role + '.';
-  snapshotContext.textContent = name.length + ' characters · ' + result.mode.toUpperCase() + ' C program';
+      ? 'Input crossed the boundary and changed the role.'
+      : 'Input fits. No adjacent bytes changed.';
+  roleValue.textContent = result.role || '(EMPTY)';
+  boundaryCopy.textContent = changed ? 'OVERFLOW → ROLE / 0x10'
+    : rejected ? 'INPUT REJECTED BEFORE COPY' : 'BUFFER ENDS AT 0x10';
+
+  if (selectedByteIndex !== null) selectMemoryByte(selectedByteIndex);
+  else byteDetail.textContent = 'Click any byte to inspect its address and value.';
 }
+
+memoryModeToggle.addEventListener('click', () => {
+  memoryDisplayMode = memoryDisplayMode === 'ascii' ? 'hex' : 'ascii';
+  const hex = memoryDisplayMode === 'hex';
+  memoryModeToggle.textContent = hex ? 'ASCII ↔' : 'HEX ↔';
+  memoryModeToggle.setAttribute('aria-label', hex ? 'Show ASCII characters' : 'Show hexadecimal byte values');
+  memoryModeToggle.setAttribute('aria-pressed', String(hex));
+  [...snapshotName.children, ...snapshotRole.children].forEach((cell, index) => {
+    cell.querySelector('.byte-character').textContent = displayByte(snapshotBytes ? snapshotBytes[index] : null);
+  });
+});
 
 function updateGuide() {
   const longRequest = Boolean(lastResult && lastName.length >= 16);
