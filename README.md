@@ -18,7 +18,7 @@ Open http://127.0.0.1:4173. The local server does not accept public network conn
 
 ## Terminal
 
-The screen represents a **4.3BSD UNIX shell session**. `fingerd` itself was a network daemon, not a separate menu program. On a real UNIX system, users interacted with it using the command `finger user@host`.
+The high-contrast, black-and-white screen represents a **4.3BSD UNIX shell session**. `fingerd` itself was a network daemon, not a separate menu program. On a real UNIX system, users interacted with it using the command `finger user@host`.
 
 Try these commands:
 
@@ -32,7 +32,9 @@ finger AAAAAAAAAAAAAAAAADMIN@research-vax
 
 The first three display period-style user information. The fourth represents a normal remote request to a finger daemon. The final command uses the controlled C demonstration: if the vulnerable model changes its adjacent role field, the **mock remote connection closes unexpectedly**. That output is an educational stand-in for corrupted state, *not* a claim to reproduce the real worm's execution.
 
-After making a remote query, press **F2** (on some Mac keyboards, **Fn + F2**) to open the separate modern memory investigation. There you can compare the bytes from the C program with the original 1988 vulnerability, activate the corrected implementation, and return to the terminal. Try the same remote request again after applying the patch.
+After the long remote query, click **See what happened** below the screen, or press **F2** (on some Mac keyboards, **Fn + F2**). This opens a separate, beginner-friendly explanation in four steps: the 16-byte name buffer, the oversized request, the neighboring memory affected in the C demonstration, and what the real 1988 vulnerability could do. Each memory box shows a character; hover over one for its hexadecimal value. Use **Next** and **Previous** to advance.
+
+From that explanation, click **Try the corrected version** to activate the safe input-length check, then repeat the exact same remote request in the terminal. The patched C version rejects it.
 
 Other supported shell-like commands include `who`, `whoami`, `date`, `hostname`, `uname`, `pwd`, `ls`, `cat /etc/motd`, `man finger`, `clear`, and `logout`. This is not a full UNIX shell.
 
@@ -42,7 +44,7 @@ This recreation was built against the 4.3BSD [finger command source](https://ret
 
 The authentic command supported short and long user listings, and remote queries of the form `user@host`. The server accepted a line over the network and passed it to the command. Its historical stack buffer flaw was the unbounded read `gets(line)` into a 512-byte array, which the worm exploited to redirect execution on vulnerable VAX systems.
 
-This project **does not run the historical binaries or emulate a VAX**. It uses a small set of fictional users, a reconstructed command interface, and a simplified local C experiment. In the experiment, a 16-byte name field sits beside an 8-byte role field within one 24-byte stack object. The controlled demonstration writes across the name field boundary but stays within the enclosing object. Its `ADMIN` field exists *only inside the model* and **did not exist in the historical `fingerd` attack**. The simulated connection closure is not a recreation of code execution.
+This project **does not run the historical binaries or emulate a VAX**. It uses a small set of fictional users, a reconstructed command interface, and a simplified local C experiment. In the experiment, a 16-byte name field sits beside an 8-byte role field within one 24-byte stack object. The controlled demonstration writes across the name field boundary but stays within the enclosing object. Its `ADMIN` field exists *only inside the model* and **did not exist in the historical `fingerd` attack**. The simulated connection closure is not a recreation of code execution. The historical terminal portion intentionally contains no explanatory overlays; the separate investigation is modern teaching material.
 
 The newer corrected C example rejects a name that would exceed its buffer, including the required NUL terminator. The original historical vulnerability was addressed by fixing or disabling vulnerable services; the presentation should not treat this educational patch as an exact reproduction of a particular 1988 vendor patch.
 
