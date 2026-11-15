@@ -265,6 +265,7 @@ function renderMemory() {
   const activeIndex = lastResult && !rejected && position > 0 ? position - 1 : null;
 
   memoryLab.classList.toggle('is-overflow', crossed);
+  memoryLab.classList.toggle('boundary-impact', replayVerified && position === 17 && crossed);
   ribbon.replaceChildren();
   for (let index = 0; index < 24; index++) {
     const segment = document.createElement('button');
@@ -335,8 +336,14 @@ function playTrace() {
   if (position >= writes.length) setTracePosition(0);
   followPlayback = true;
   tracePlay.textContent = 'PAUSE Ⅱ';
+  let boundaryHold = 0;
   traceTimer = setInterval(() => {
+    if (boundaryHold > 0) {
+      boundaryHold--;
+      return;
+    }
     setTracePosition(position + 1);
+    if (position === 17 && writes.length > 17) boundaryHold = 3;
     if (position >= writes.length) {
       stopTrace();
       tracePlay.textContent = 'REPLAY ↻';
