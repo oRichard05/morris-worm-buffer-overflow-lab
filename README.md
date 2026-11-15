@@ -20,7 +20,9 @@ Open http://127.0.0.1:4173. The local server does not accept public network conn
 
 The high-contrast, black-and-white screen represents a **4.3BSD UNIX shell session**. `fingerd` itself was a network daemon, not a separate menu program. On a real UNIX system, users interacted with it using the command `finger user@host`.
 
-A small **Lab Guide** beside the terminal suggests one command at a time. Click **Insert command**, then press **Enter** to run it; the button does not execute anything automatically. After each remote query, the **Memory Inspector** updates with the real 24-byte snapshot returned by the local C executable: 16 bytes for the name and 8 for the adjacent role. Changed role bytes are highlighted. It is a snapshot **after each execution**, not continuous live memory streaming or a historical debugger. The guide and memory pane are modern educational additions; the terminal text itself remains 1988-style.
+The lab now uses a **single guided workbench** rather than a narrow sidebar. A short prompt above the UNIX terminal shows one task at a time. Click **Run example** to execute that command immediately, or type your own command in the terminal and press **Enter**. The walkthrough advances as you complete each request.
+
+Directly below the terminal, the full-width **Memory Inspector** displays 24 actual bytes from the C executable after each remote query. The 16 name bytes and 8 neighboring role bytes are separated and labeled; byte offsets are shown below the characters, and changed role bytes switch to a bright background. Hover over a byte to see its hexadecimal value. This is a snapshot **after each execution**, not continuous memory streaming or a historical debugger. The guided workbench and memory inspector are modern teaching tools; the UNIX text interface remains a reconstruction of the period.
 
 Try these commands:
 
@@ -34,7 +36,7 @@ finger AAAAAAAAAAAAAAAAADMIN@research-vax
 
 The first three display period-style user information. The fourth represents a normal remote request to a finger daemon. The final command uses the controlled C demonstration: if the vulnerable model changes its adjacent role field, the **mock remote connection closes unexpectedly**. That output is an educational stand-in for corrupted state, *not* a claim to reproduce the real worm's execution.
 
-After the long remote query, click **See what happened (F2)** or press **F2** (on some Mac keyboards, **Fn + F2**). A separate four-step lesson explains the memory layout, why the name does not fit, how the neighboring bytes changed, and the connection to the original 1988 vulnerability. Each box represents one byte; hover for its hexadecimal value. At step three, the write replay runs automatically and can be restarted with **Replay the write**. It is reconstructed and checked against the final C memory output, not recorded from a live debugger.
+After the long remote query, click **Understand the overflow** or press **F2** (on some Mac keyboards, **Fn + F2**). A separate four-step lesson explains the memory layout, why the name does not fit, how the neighboring bytes changed, and the connection to the original 1988 vulnerability. Each box represents one byte; hover for its hexadecimal value. At step three, the write replay runs automatically and can be restarted with **Replay the write**. It is reconstructed and checked against the final C memory output, not recorded from a live debugger.
 
 At step four, choose **Try the fix**. The terminal returns with the same remote query already typed; press **Enter** to run it against the corrected C program. The long request should now be rejected. You can open the investigation again to see that the neighboring role stays unchanged. From the final step of that corrected walkthrough, **Reset experiment** restores the vulnerable model for another demonstration.
 
