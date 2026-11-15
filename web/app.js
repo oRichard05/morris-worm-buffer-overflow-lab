@@ -349,7 +349,7 @@ traceSeek.addEventListener('input', () => {
 });
 
 function setMode(nextMode) {
-  if (mode === nextMode) return;
+  if (running || mode === nextMode) return;
   stopTrace();
   mode = nextMode;
   lastResult = null;
