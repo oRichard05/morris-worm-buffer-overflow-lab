@@ -270,33 +270,37 @@ function renderLesson() {
   const steps = [
     {
       title: 'Where does the name go?',
-      description: 'The program reserves 16 bytes for a name. A second field, the role, sits immediately beside it.',
-      explanation: 'Each box is one byte. Names also need an extra byte at the end to mark where the string stops.'
+      description: 'The C program has 16 bytes reserved for a name, followed by 8 bytes for a role.',
+      explanation: 'Each box is one byte. The name also needs a final byte to mark its end, so at most 15 letters fit safely.'
     },
     {
-      title: 'The name is too long',
-      description: 'The request contains ' + lastName.length + ' characters. Including the string-ending byte, it needs ' + (lastName.length + 1) + ' bytes.',
+      title: isLong ? 'The name does not fit' : 'The name fits',
+      description: 'This request contains ' + lastName.length + ' characters. With the end-of-string byte, it needs ' + (lastName.length + 1) + ' spaces. Only 16 are available for the name.',
       explanation: isLong
-        ? 'The name area only holds 16 bytes. The displayed first 16 writes are hypothetical if the patched program rejected this request.'
-        : 'This input fits. There is room for the final string-ending byte.'
+        ? 'The first 16 boxes show where the letters would go. There is still more input left, but no more room in the name field.'
+        : 'There is room for the whole name and the end-of-string byte.'
     },
     {
-      title: rejected ? 'The fix stops the copy' : 'The extra bytes cross the boundary',
+      title: rejected ? 'The fix stops the write' : isLong ? 'The input crosses the boundary' : 'The memory stays intact',
       description: rejected
-        ? 'This time the C program checked the length first. It rejected the request instead of writing beyond the name field.'
+        ? 'The corrected C program checked the length before copying anything. The request was rejected.'
         : isLong
-          ? 'Watch how the unchecked input goes beyond the name buffer and changes the adjacent role.'
-          : 'The name stayed inside its own space. The neighboring field was not modified.',
+          ? 'The input keeps going past the name field. In our C model, it changes the neighboring role from GUEST to ' + lastResult.role + '.'
+          : 'The input stays inside the name field. The role remains GUEST.',
       explanation: rejected
-        ? 'The role still reads GUEST. No input bytes were copied.'
+        ? 'No input was copied. The neighboring role still reads GUEST.'
         : isLong
-          ? 'The highlighted boxes show neighboring memory affected by our controlled C experiment.'
-          : 'The neighboring role still reads GUEST.'
+          ? 'Watch the letters reach the end of the name field and enter the next memory region.'
+          : 'All the bytes stay where they belong.'
     },
     {
-      title: 'Why was this dangerous in 1988?',
-      description: 'The real fingerd also accepted text without checking its length, but used a 512-byte buffer. A carefully crafted request could change where the program executed next.',
-      explanation: 'Our 16-byte example changes a nearby field to make the problem visible. It is not the original worm or a reproduction of its exploit.'
+      title: mode === 'patched' ? 'Why did the fix work?' : 'What happened in 1988?',
+      description: mode === 'patched'
+        ? 'The same long input was rejected because it would not fit in the buffer. The neighboring data was left unchanged.'
+        : 'The real UNIX fingerd service used an unchecked gets() call with a 512-byte buffer. The Morris Worm exploited that mistake to redirect the program\'s execution.',
+      explanation: mode === 'patched'
+        ? 'The historical lesson: check an input\'s length before writing it into memory. Return to the terminal or reset the experiment to compare.'
+        : 'Our 16-byte model only changes a role field; the 1988 attack could change which instructions ran. Choose Try the fix to repeat the same input with a length check.'
     }
   ];
 
@@ -314,7 +318,10 @@ function renderLesson() {
   if (canReplay) replayWrites();
 
   previousButton.disabled = lessonStep === 0;
-  nextButton.textContent = lessonStep === 3 ? 'Start over ↻' : 'Next →';
+  nextButton.textContent = lessonStep === 3
+    ? mode === 'patched' ? 'Back to terminal →' : 'Try the fix →'
+    : 'Next →';
+  document.getElementById('reset-demo').hidden = !(lessonStep === 3 && mode === 'patched');
 }
 
 function showAnalysis() {
@@ -337,8 +344,23 @@ previousButton.addEventListener('click', () => {
   lessonStep = Math.max(0,lessonStep - 1);
   renderLesson();
 });
+function changeVersion(nextMode) {
+  const previousQuery = lastName;
+  mode = nextMode;
+  lastResult = null;
+  inspectLink.hidden = true;
+  closeAnalysis();
+  input.value = previousQuery ? 'finger ' + previousQuery + '@research-vax' : '';
+  input.focus();
+}
+
 nextButton.addEventListener('click', () => {
-  lessonStep = lessonStep === 3 ? 0 : lessonStep + 1;
+  if (lessonStep === 3) {
+    if (mode === 'patched') closeAnalysis();
+    else changeVersion('patched');
+    return;
+  }
+  lessonStep++;
   renderLesson();
 });
 inspectLink.addEventListener('click', showAnalysis);
@@ -370,15 +392,8 @@ input.addEventListener('keydown', event => {
 });
 terminalView.addEventListener('click', () => input.focus());
 document.getElementById('return-terminal').addEventListener('click', closeAnalysis);
-document.getElementById('apply-patch').addEventListener('click', () => {
-  mode = 'patched';
-  inspectLink.hidden = true;
-  closeAnalysis();
-});
 document.getElementById('reset-demo').addEventListener('click', () => {
-  mode = 'vulnerable';
-  inspectLink.hidden = true;
-  closeAnalysis();
+  changeVersion('vulnerable');
 });
 document.addEventListener('keydown', event => {
   if (event.key === 'F2' && analysisView.hidden && lastResult) {
