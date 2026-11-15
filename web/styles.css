@@ -328,12 +328,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid #e8e8e7; outline-
   .memory-byte { min-height: 46px; }
 }
 @media (max-width: 600px) {
-  .terminal-view { padding: 18px 14px; }
-  .screen {
-    height: calc(100dvh - 36px);
-    min-height: 300px;
-    font-size: 13px;
-  }
   .analysis-view { padding: 25px 14px 45px; }
   .memory-byte { font-size: 13px; }
 }
