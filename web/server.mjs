@@ -34,9 +34,7 @@ function parseOutput(stdout, mode) {
   return {
     mode,
     status: lines.STATUS || 'ACCEPTED',
-    name: lines.NAME || '',
-    next: lines.NEXT || '',
-    flow: lines.FLOW || '',
+    corrupted: lines.CORRUPTED === 'YES',
     memory,
     stdout: stdout.trim()
   };
