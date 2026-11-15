@@ -251,78 +251,70 @@ function describeByte(index) {
   if (index >= 16 && number !== before) text += ' · previously ' + byteHex(before);
   return text;
 }
-function renderDumpRow(start, baseline, crossed) {
-  const row = document.createElement('div');
-  row.className = 'dump-row';
-  if (crossed && start >= 16) row.classList.add('is-overwritten');
+function renderMemoryCell(index, baseline, crossed) {
+  const cell = document.createElement('button');
+  const changed = crossed && index >= 16 &&
+    index < position && bytes[index] !== baseline[index];
+  const current = position > 0 && index === position - 1;
 
-  const address = document.createElement('span');
-  address.className = 'dump-address';
-  address.textContent = '+0x' + start.toString(16).toUpperCase().padStart(2, '0');
-
-  const values = document.createElement('div');
-  values.className = 'dump-hex';
-  for (let index = start; index < start + 8; index++) {
-    const cell = document.createElement('button');
-    cell.type = 'button';
-    const changed = index >= 16 && index < position && bytes[index] !== baseline[index];
-    cell.className = 'mem-byte'
-      + (index < position ? ' written' : '')
-      + (crossed && changed ? ' crossed' : '')
-      + (index === position - 1 && position > 0 ? ' cursor' : '')
-      + (index === selectedByte ? ' chosen' : '');
-    cell.textContent = byteHex(bytes[index]).slice(2);
-    cell.title = describeByte(index);
-    cell.setAttribute('aria-label', cell.title);
-    cell.addEventListener('click', () => {
-      selectedByte = index;
-      $('byte-info').textContent = describeByte(index);
-      renderTrace();
-    });
-    values.append(cell);
-  }
-  const ascii = document.createElement('span');
-  ascii.className = 'dump-ascii';
-  ascii.textContent = bytes.slice(start, start + 8)
-    .map(value => value >= 32 && value <= 126 ? String.fromCharCode(value) : '·')
-    .join('');
-
-  row.append(address, values, ascii);
-  return row;
+  cell.type = 'button';
+  cell.className = 'memory-cell'
+    + (bytes[index] === 0 ? ' empty' : '')
+    + (index < position ? ' written' : '')
+    + (changed ? ' crossed' : '')
+    + (current ? ' current' : '')
+    + (index === selectedByte ? ' selected' : '');
+  cell.textContent = byteText(bytes[index]);
+  cell.title = describeByte(index);
+  cell.setAttribute('aria-label', cell.title);
+  cell.addEventListener('click', () => {
+    selectedByte = index;
+    $('byte-info').textContent = describeByte(index);
+    $('byte-info').hidden = false;
+    renderTrace();
+  });
+  return cell;
 }
 
 function renderTrace() {
   const baseline = initialFrame();
-  nameBytes.replaceChildren();
-  nextBytes.replaceChildren();
   const crossed = replayVerified && position > 16;
-  const finishing = lastResult && (lastResult.status === 'INPUT REJECTED' || position >= writes.length);
-  const changed = lastResult && finishing &&
-    bytes.slice(16).some((value, index) => value !== baseline[16 + index]);
+  const finishing = Boolean(lastResult &&
+    (lastResult.status === 'INPUT REJECTED' || position >= writes.length));
+  const changed = Boolean(lastResult && finishing &&
+    bytes.slice(16).some((value, index) => value !== baseline[16 + index]));
 
   tracePanel.classList.toggle('is-crossing', crossed);
   $('flow-visual').classList.toggle('is-diverted',
     Boolean(lastResult && finishing && lastResult.flow === 'DIVERTED'));
-  nameBytes.append(renderDumpRow(0, baseline, crossed), renderDumpRow(8, baseline, crossed));
-  nextBytes.append(renderDumpRow(16, baseline, crossed));
 
+  nameBytes.replaceChildren();
+  nextBytes.replaceChildren();
+  for (let i = 0; i < 24; i++) {
+    (i < 16 ? nameBytes : nextBytes).append(renderMemoryCell(i, baseline, crossed));
+  }
+
+  $('boundary-caption').textContent = crossed ? 'OVERFLOW! 16-BYTE LIMIT' : '16-BYTE LIMIT';
   $('flow-value').textContent = !lastResult ? '—'
     : lastResult.status === 'INPUT REJECTED' ? 'RETURN'
     : !finishing && crossed ? 'WRITING…'
     : finishing ? lastResult.next || '?' : 'RETURN';
-  $('trace-count').textContent = position + ' / ' + writes.length + ' BYTES';
+
+  $('trace-count').textContent = position + ' / ' + writes.length;
   traceSeek.value = String(position);
   $('trace-state').textContent = !lastResult ? 'READY'
     : lastResult.status === 'INPUT REJECTED' ? 'BLOCKED'
     : !finishing && crossed ? 'OVERFLOW'
     : !finishing && position > 0 ? 'WRITING'
     : changed ? 'ALTERED' : finishing ? 'COMPLETE' : 'READY';
-  $('trace-caption').textContent = !lastResult ? 'Run a query to inspect memory.'
-    : lastResult.status === 'INPUT REJECTED' ? 'Rejected before writing any input bytes.'
-    : !finishing && crossed ? 'Bytes are now crossing the 16-byte limit.'
-    : !finishing ? 'Reconstructing the memory writes…'
-    : lastResult.flow === 'DIVERTED' ? 'The symbolic next step has changed.'
-    : 'The input stayed within its buffer.';
+
+  $('trace-caption').textContent = !lastResult ? 'Run the example to watch the memory fill.'
+    : lastResult.status === 'INPUT REJECTED' ? 'Stopped before the memory was changed.'
+    : !finishing && crossed ? 'The input has passed the buffer limit!'
+    : !finishing ? 'Writing the input, one byte at a time…'
+    : lastResult.flow === 'DIVERTED' ? 'The next step was changed.'
+    : 'The next step stayed unchanged.';
+
   $('trace-source').textContent = !lastResult ? 'BEFORE INPUT'
     : lastResult.status === 'INPUT REJECTED' ? 'PATCHED / C RESULT'
     : replayVerified ? 'VERIFIED C REPLAY' : 'C RESULT';
@@ -348,11 +340,12 @@ function playTrace() {
       stopTrace();
       tracePlay.textContent = 'Replay';
     }
-  }, 95);
+  }, 150);
 }
 function useResult(result, name) {
   stopTrace();
   selectedByte = null;
+  $('byte-info').hidden = true;
   $('input-preview').textContent = name;
   $('input-length').textContent = name.length + ' CHARS + END BYTE';
   const target = result.memory.map(hex => Number.parseInt(hex, 16));
@@ -395,15 +388,15 @@ function updateGuide() {
     description = 'Run the same long request with the length check.';
     command = 'finger ' + payload + '@research-vax';
   } else if (hasLong) {
-    label = '03 / EXPLAIN'; title = 'Follow the overwritten bytes';
-    description = 'The boundary has been crossed. Examine the trace.';
+    label = '03 / OVERFLOW'; title = 'The input crossed the limit';
+    description = 'Watch the memory change below.';
   } else if (lastResult) {
-    label = '02 / OVERFLOW'; title = 'Now exceed 16 bytes';
-    description = 'Compare this write with a longer request.';
+    label = '02 / OVERFLOW'; title = 'Now overflow the buffer';
+    description = 'Send a name that is too long.';
     command = 'finger ' + payload + '@research-vax';
   } else {
-    label = '01 / BASELINE'; title = 'Start with a short name';
-    description = 'Watch a normal request stay inside its buffer.';
+    label = '01 / START'; title = 'Start with a short name';
+    description = 'Watch the memory fill.';
     command = 'finger alice@research-vax';
   }
   $('guide-step').textContent = label;
@@ -508,6 +501,7 @@ function switchMode(nextMode) {
   replayVerified = false;
   bytes = initialFrame();
   selectedByte = null;
+  $('byte-info').hidden = true;
   $('input-preview').textContent = 'Awaiting a finger request';
   $('input-length').textContent = '0 BYTES';
   traceSeek.disabled = true;
