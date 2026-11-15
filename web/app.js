@@ -37,6 +37,7 @@ function render(lines, label = 'Selection:', help = 'ENTER: select') {
 
 function menu(notice = '') {
   screen = 'menu';
+  form.classList.remove('continue');
   render([
     line('RESEARCH COMPUTING CENTER', 'heading'),
     line('USER INFORMATION SERVICE  /  1988', 'subheading'),
@@ -56,6 +57,7 @@ function menu(notice = '') {
 
 function directory() {
   screen = 'lookup';
+  form.classList.remove('continue');
   render([
     line('USER DIRECTORY', 'heading'),
     '--------------------------------------------------------',
@@ -76,7 +78,7 @@ function result(lines, title = 'USER DIRECTORY') {
     '',
     '',
     line('Press ENTER to continue.', 'dim')
-  ], '', 'ENTER: main menu   ESC: main menu' + (lastInput.length >= 16 ? '   F2: investigation' : ''));
+  ], '', 'ENTER: main menu   ESC: main menu' + (lastInput.length >= 16 ? '   I: investigate' : ''));
   form.classList.add('continue');
 }
 
@@ -96,7 +98,8 @@ function restricted() {
       'This is fictional demonstration data.',
       '',
       line('Press ENTER to continue.', 'dim')
-    ], '', 'ENTER: main menu   F2: investigation');
+    ], '', 'ENTER: main menu   I: investigate');
+    form.classList.add('continue');
   } else {
     render([
       line('RESTRICTED RECORDS', 'heading'),
@@ -109,6 +112,7 @@ function restricted() {
       '',
       line('Press ENTER to continue.', 'dim')
     ], '', 'ENTER: main menu');
+    form.classList.add('continue');
   }
 }
 
@@ -127,6 +131,7 @@ function systemInformation() {
     '',
     line('Press ENTER to continue.', 'dim')
   ], '', 'ENTER: main menu');
+  form.classList.add('continue');
 }
 
 function logout() {
@@ -141,6 +146,7 @@ function logout() {
     '',
     line('Press ENTER to reconnect.', 'dim')
   ], '', 'ENTER: reconnect');
+  form.classList.add('continue');
 }
 
 async function lookup(name) {
@@ -214,11 +220,14 @@ async function submit(value) {
     else if (entry === '2') restricted();
     else if (entry === '3') systemInformation();
     else if (entry === '4') logout();
+    else if (entry.toLowerCase() === 'i' && lastResult) showAnalysis();
     else menu('Select a number from 1 to 4.');
   } else if (screen === 'lookup') {
     if (entry) await lookup(entry);
   } else if (screen === 'logout') {
     menu();
+  } else if (entry.toLowerCase() === 'i' && lastResult) {
+    showAnalysis();
   } else {
     menu();
   }
@@ -287,7 +296,7 @@ input.addEventListener('keydown', event => {
     form.classList.remove('continue');
     menu();
   }
-  if (event.key === 'F2' && lastResult) {
+  if ((event.key === 'F2' || (event.key.toLowerCase() === 'i' && screen === 'result')) && lastResult) {
     event.preventDefault();
     showAnalysis();
   }
