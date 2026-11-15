@@ -7,7 +7,8 @@
   "scripts": {
     "build:lab": "make -C lab",
     "start": "node web/server.mjs",
-    "test": "sh lab/check.sh"
+    "test": "sh lab/check.sh",
+    "prestart": "npm run build:lab"
   },
   "engines": {
     "node": ">=18"
